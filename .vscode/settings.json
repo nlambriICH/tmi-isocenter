@@ -1,0 +1,13 @@
+{
+    "python.formatting.provider": "black",
+    "editor.formatOnSave": true,
+    "python.analysis.typeCheckingMode": "basic",
+    "python.linting.pylintEnabled": true,
+    "python.linting.enabled": true,
+    "python.linting.pylintArgs": [
+        "--errors-only",
+        "--generated-members=numpy.*,torch.*"
+    ],
+    "csv-preview.lineNumbers": "ordinal",
+    "csv-preview.formatValues": "never"
+}
