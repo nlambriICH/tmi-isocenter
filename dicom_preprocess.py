@@ -379,8 +379,8 @@ if __name__ == "__main__":
         angles,
     ) = read_dicoms()
 
-    if not os.path.exists(r"dataset\raw"):
-        os.makedirs(r"dataset\raw")
+    if not os.path.exists(r"data\raw"):
+        os.makedirs(r"data\raw")
 
     pd.DataFrame(
         patient_info,
@@ -396,11 +396,11 @@ if __name__ == "__main__":
             "OrigMaskShape_x",
             "OrigMaskShape_z",
         ),
-    ).to_csv(r"dataset\patient_info.csv")
+    ).to_csv(r"data\patient_info.csv")
     np.savez(
-        r"dataset\raw\masks2D.npz", *masks
+        r"data\raw\masks2D.npz", *masks
     )  # unpack the list to pass the mask2D arrays as positional arguments
-    np.save(r"dataset\raw\isocenters_pix.npy", np.array(isocenters_pix))
-    np.save(r"dataset\raw\jaws_X_pix.npy", np.array(jaws_X_pix))
-    np.save(r"dataset\raw\jaws_Y_pix.npy", np.array(jaws_Y_pix))
-    np.save(r"dataset\raw\angles.npy", np.array(angles))
+    np.save(r"data\raw\isocenters_pix.npy", np.array(isocenters_pix))
+    np.save(r"data\raw\jaws_X_pix.npy", np.array(jaws_X_pix))
+    np.save(r"data\raw\jaws_Y_pix.npy", np.array(jaws_Y_pix))
+    np.save(r"data\raw\angles.npy", np.array(angles))
