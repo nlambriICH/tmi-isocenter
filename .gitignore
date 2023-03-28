@@ -1,6 +1,6 @@
 # Repository specific
 test/
-dataset/
+data/
 lightning_logs/
 /src/config/constants.json
 

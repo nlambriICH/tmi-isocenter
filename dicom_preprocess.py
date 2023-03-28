@@ -41,7 +41,7 @@ def filter_junction_name(name: str) -> bool:
 def get_ptv_mask_3d(
     rtstruct: RTStruct,
     ptv_name: str,
-    junction_names: str | tuple[str] | None = None,
+    junction_names: str | list[str] | None = None,
 ) -> np.ndarray:
     """
     Get a 3D mask of the Planning Target Volume (PTV) and optionally its junctions.
@@ -49,10 +49,10 @@ def get_ptv_mask_3d(
     Parameters:
     - rtstruct: An instance of the RTStruct class containing the RT structure set.
     - ptv_name: The name of the PTV ROI in the RTStruct.
-    - junction_names: Optional. A string or tuple of strings containing the names of the PTV junction ROIs in the RTStruct.
+    - junction_names: Optional. A string or list of strings containing the names of the PTV junction ROIs in the RTStruct.
                       If None, an empty mask is created for the junctions.
                       If a string, the whole junction ROI is used.
-                      If a tuple of strings, the union of the junction substructures is used.
+                      If a list of strings, the union of the junction substructures is used.
                       Default is None.
 
     Returns:
@@ -71,7 +71,7 @@ def get_ptv_mask_3d(
         mask_3d_junction = rtstruct.get_roi_mask_by_name(
             junction_names
         )  # whole junction
-    elif isinstance(junction_names, tuple):
+    elif isinstance(junction_names, list):
         mask_3d_junction = np.logical_or.reduce(
             list(map(rtstruct.get_roi_mask_by_name, junction_names))
         )  # union of junction substructures
@@ -298,7 +298,7 @@ def read_dicoms():
         junction_names = (
             MAP_ID_JUNCTION[patient_id]
             if patient_id in MAP_ID_JUNCTION
-            else tuple(filter(filter_junction_name, rtstruct.get_roi_names()))
+            else list(filter(filter_junction_name, rtstruct.get_roi_names()))
         )
 
         mask_3d = get_ptv_mask_3d(
