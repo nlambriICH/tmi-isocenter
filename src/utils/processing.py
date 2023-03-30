@@ -4,7 +4,7 @@ from imgaug.augmentables import Keypoint, KeypointsOnImage
 
 
 class Processing:
-    """Preprocessing class to prepare the data and for post-training operations"""
+    """Processing class to prepare the data and for post-training operations"""
 
     def __init__(
         self,
@@ -76,7 +76,7 @@ class Processing:
 
         assert (
             masks_aug.shape[1] == masks_aug.shape[2]
-        ), "Cannot rescale because 2D masks are not square matrices"
+        ), "Cannot scale because 2D masks are not square matrices"
 
         return (
             masks_aug,
