@@ -110,36 +110,41 @@ def transform_field_geometry(
         raise ValueError(f'from_to must be "pat_pix" or "pix_pat" but was {from_to}')
 
     iso_transf = apply_transformation_to_3d_points(iso_orig, transf_matrix)
-    # Assign zero where all isocenter's coord is 0
+    # Assign zero where all isocenter's coord=0
     iso_transf[get_zero_row_idx(iso_orig)] = 0
 
     jaw_X_kps, jaw_Y_kps = get_jaw_kps_from_aperture(iso_orig, jaw_X_orig, jaw_Y_orig)
 
     # Reshape to (24, 1)
-    # Append two columns of zeros to obtain 3d vectors for transformation matrix
+    # Append (y, z) isocenters coordinates to obtain 3d vectors for transformation matrix
     jaw_X_kps_vect = np.append(
-        jaw_X_kps.reshape(-1, 1), np.zeros((jaw_X_kps.size, 2)), axis=1
+        jaw_X_kps.reshape(-1, 1),
+        np.repeat(iso_orig[:, 1:], 2, axis=0),  # repeat coords for each aperture
+        axis=1,
     )
-    jaw_Y_kps_vect = np.insert(
-        jaw_Y_kps.reshape(-1, 1), [0], np.zeros((jaw_Y_kps.size, 2)), axis=1
-    )  # prepend zeros because jaw_Y is along the z-axis
-
-    # Keep only x-coord
     # Reshape to (12, 2) to recover the original shape
     # Assign zero where all original X jaw apertures=0
     jaw_X_kps_transf = apply_transformation_to_3d_points(jaw_X_kps_vect, transf_matrix)[
-        :, 0
+        :, 0  # Keep only x-coords
     ]
-    jaw_X_kps_transf = jaw_X_kps_transf.reshape(jaw_X_kps.shape[0], -1)
+    jaw_X_kps_transf = jaw_X_kps_transf.reshape(jaw_X_kps.shape)
     jaw_X_kps_transf[get_zero_row_idx(jaw_X_orig)] = 0
 
-    # Keep only x-coord
+    # Reshape to (24, 1)
+    # Prepend (x, y) isocenters coordinates to obtain 3d vectors for transformation matrix
+    # Note: jaw_Y is along the z-axis
+    jaw_Y_kps_vect = np.insert(
+        jaw_Y_kps.reshape(-1, 1),
+        [0],
+        np.repeat(iso_orig[:, :2], 2, axis=0),  # repeat coords for each aperture
+        axis=1,
+    )
     # Reshape to (12, 2) to recover the original shape
     # Assign zero where all original Y jaw apertures=0
     jaw_Y_kps_transf = apply_transformation_to_3d_points(jaw_Y_kps_vect, transf_matrix)[
-        :, 2
+        :, 2  # Keep only z-coords
     ]
-    jaw_Y_kps_transf = jaw_Y_kps_transf.reshape(jaw_Y_kps.shape[0], -1)
+    jaw_Y_kps_transf = jaw_Y_kps_transf.reshape(jaw_Y_kps.shape)
     jaw_Y_kps_transf[get_zero_row_idx(jaw_Y_orig)] = 0
 
     jaw_X_transf, jaw_Y_transf = get_jaw_aperture_from_kps(
