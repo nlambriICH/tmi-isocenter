@@ -1,7 +1,7 @@
 # Repository specific
-test/
-data/
-lightning_logs/
+/test/
+/data/
+/lightning_logs/
 /src/config/constants.json
 
 # Byte-compiled / optimized / DLL files
