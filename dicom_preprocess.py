@@ -338,10 +338,12 @@ def read_dicoms():
             np.sign(jaw_Y_pixel) == np.sign(jaw_Y)
         ), "The sign of Y apertures between dicom and patient's coord systems was not conserved"
 
-        # Saving the middle coronal slice, i.e., middle (x, z) plane
-        # for memory reasons (~65 MB vs ~130 KB)
-        # TODO: train model using more slices
-        mask_2d = mask_3d[mask_3d.shape[0] // 2, :, :]
+        # Saving the coronal projection (i.e., (x, z) plane) of the PTV mask
+        # The 2D mask is the result of the OR operation
+        # between the PTV mask of all coronal slices
+        # TODO: investigate whether the use of a 3D PTV mask
+        # can improve the performance of the model
+        mask_2d = mask_3d.any(axis=0)
 
         masks.append(mask_2d)
         isocenters_pix.append(iso_pixel)

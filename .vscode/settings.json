@@ -9,5 +9,6 @@
         "--generated-members=numpy.*,torch.*"
     ],
     "csv-preview.lineNumbers": "ordinal",
-    "csv-preview.formatValues": "never"
+    "csv-preview.formatValues": "never",
+    "notebook.formatOnSave.enabled": true
 }
