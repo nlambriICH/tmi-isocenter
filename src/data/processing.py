@@ -96,7 +96,23 @@ class Processing:
         return masks, np.concatenate((isos_flat, jaws_X_flat, jaws_Y_flat), axis=1)
 
     # TODO: implement inverse operations of resize_scale
-    # TODO: implement 90° CCW rotation of masks such that the conv starts head first
+    def rotate_90(self) -> list[np.ndarray]:
+        """
+        Rotates each 2D mask in the instance variable `self.masks` 90 degrees counterclockwise.
+
+        Returns:
+            A list of NumPy arrays, where each array is a 2D mask rotated 90 degrees counterclockwise.
+        """
+
+        masks_rot = []
+
+        for mask2d in self.masks:
+            rot = iaa.Rot90(k=1, keep_size=False)
+            mask_rot = rot.augment_image(image=mask2d)
+
+            masks_rot.append(mask_rot)
+
+        return masks_rot
 
     # TODO: remove duplicate information of x and z coords.
     # For the moment keep all x- and z-coords of the isocenters:
