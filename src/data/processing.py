@@ -168,6 +168,29 @@ class Processing:
 
         return self
 
+    def scale(self):
+        """
+        Scale the isocenters_pix, jaws_X_pix, and jaws_Y_pix attributes of the object
+        based on the size of the masks in the object.
+
+        Raises:
+        - AssertionError: If any 2D mask in the object is not a square matrix.
+
+        Returns:
+        - None
+        """
+        assert np.all(
+            [mask.shape[0] == mask.shape[1] for mask in self.masks]
+        ), "Cannot scale because 2D masks are not square matrices"
+
+        width_resize = self.masks[0].shape[1]
+
+        self.isocenters_pix = self.isocenters_pix / width_resize
+        self.jaws_X_pix = self.jaws_X_pix / width_resize
+        self.jaws_Y_pix = self.jaws_Y_pix / width_resize
+
+        return self
+
     # TODO: remove duplicate information of x and z coords.
     # For the moment keep all x- and z-coords of the isocenters:
     # - z coord is the same for isocenter groups
