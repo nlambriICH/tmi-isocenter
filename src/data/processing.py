@@ -114,6 +114,60 @@ class Processing:
 
         return masks_rot
 
+    def resize(self):
+        """Resize all masks to have a height of 512 pixels while preserving the aspect ratio.
+        The width of the masks will be adjusted accordingly.
+
+        This method uses the `iaa.Resize` class from the imgaug library to perform the resizing
+        operation. The isocenters and Y-jaw aperture positions are adjusted accordingly.
+        Only the Y-jaw aperture needs to be resized as the X aperture is aligned with the
+        height dimension of the mask.
+
+        Raises:
+            AssertionError: If not all masks have a height of 512 pixels.
+
+        Returns:
+            None.
+        """
+
+        assert np.all(
+            [mask.shape[0] == 512 for mask in self.masks]
+        ), "Not all masks have height=512"
+
+        width_resize = 512
+
+        masks_aug = np.zeros(shape=(self.num_patients, 512, width_resize))
+        isos_kps_img_aug = np.zeros(shape=(self.num_patients, self.iso_per_patient, 2))
+        jaws_Y_pix_aug = np.zeros_like(self.jaws_Y_pix)
+
+        resize = iaa.Resize(size={"height": 512, "width": width_resize})
+
+        for i, (mask2d, iso_pix, jaw_Y_pix) in enumerate(
+            zip(self.masks, self.isocenters_pix, self.jaws_Y_pix)
+        ):
+            # Keypoint x: column-wise == dicom-z, keypoint y: row-wise == dicom-x
+            iso_kps_img = KeypointsOnImage(
+                [Keypoint(x=iso[2], y=iso[0]) for iso in iso_pix],
+                shape=mask2d.shape,
+            )
+
+            mask_aug, iso_kps_img_aug = resize.augment(
+                image=mask2d, keypoints=iso_kps_img
+            )  # pyright: ignore[reportGeneralTypeIssues]
+            masks_aug[i] = mask_aug
+            isos_kps_img_aug[i] = iso_kps_img_aug.to_xy_array()
+
+            # Only Y apertures need to be resized (X aperture along x/height)
+            jaw_Y_pix_aug = jaw_Y_pix * width_resize / mask2d.shape[1]
+            jaws_Y_pix_aug[i] = jaw_Y_pix_aug
+
+        self.masks = masks_aug
+        self.isocenters_pix = isos_kps_img_aug
+        self.jaws_X_pix = self.jaws_X_pix
+        self.jaws_Y_pix = jaws_Y_pix_aug
+
+        return self
+
     # TODO: remove duplicate information of x and z coords.
     # For the moment keep all x- and z-coords of the isocenters:
     # - z coord is the same for isocenter groups
