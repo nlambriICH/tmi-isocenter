@@ -1,6 +1,7 @@
 import numpy as np
 import imgaug.augmenters as iaa
 from imgaug.augmentables import Keypoint, KeypointsOnImage
+from src.utils.field_geometry_transf import get_zero_row_idx
 
 
 class Processing:
@@ -20,101 +21,14 @@ class Processing:
             jaws_X_pix (np.ndarray): Array of shape (num_patients, iso_per_patient, 2) containing the X-jaws apertures in pixel coordinates.
             jaws_Y_pix (np.ndarray): Array of shape (num_patients, iso_per_patient, 2) containing the Y-jaws apertures in pixel coordinates.
         """
-        self.masks = masks
-        self.isocenters_pix = isocenters_pix
-        self.jaws_X_pix = jaws_X_pix
-        self.jaws_Y_pix = jaws_Y_pix
+        self.masks = masks.copy()
+        self.isocenters_pix = isocenters_pix.copy()
+        self.jaws_X_pix = jaws_X_pix.copy()
+        self.jaws_Y_pix = jaws_Y_pix.copy()
         self.num_patients = len(masks)
         self.iso_per_patient = isocenters_pix.shape[1]
 
-    def resize_scale(self) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        """
-        Resize masks and associated data to the same width and height, assuming a height of 512 pixels. Scale the pixel positions to the range [0, 1].
-
-        Args:
-            masks (np.ndarray): Array of shape (num_patients, 512, height) containing the masks to be resized.
-            isocenters_pix (np.ndarray): Array of shape (num_patients, iso_per_patient, 3) containing the position of the isocenters in pixel coordinates.
-            jaws_Y_pix (np.ndarray): Array of shape (num_patients, iso_per_patient, 2) containing the Y-jaws apertures in pixel.
-
-        Returns:
-            tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]: A tuple of three numpy arrays:
-                masks_resize (np.ndarray): Array of shape (num_patients, 512, 512) containing the resized masks.
-                iso_rescaled (np.ndarray): Array of shape (num_patients, iso_per_patient, 2) containing the resized and scaled positions of the isocenters on the image plane.
-                jaw_X_rescaled (np.ndarray): Array of shape (num_patients, iso_per_patient, 2) containing the scaled X-jaws apertures in pixel.
-                jaw_Y_rescaled (np.ndarray): Array of shape (num_patients, iso_per_patient, 2) containing the resized and scaled Y-jaws apertures in pixel.
-        """
-        assert np.all(
-            [mask.shape[0] == 512 for mask in self.masks]
-        ), "Not all masks have height=512"
-
-        width_resize = 512
-
-        masks_aug = np.zeros(shape=(self.num_patients, 512, width_resize))
-        isos_kps_img_aug = np.zeros(shape=(self.num_patients, self.iso_per_patient, 2))
-        jaws_Y_pix_aug = np.zeros_like(self.jaws_Y_pix)
-
-        resize = iaa.Resize(size={"height": 512, "width": width_resize})
-
-        for i, (mask2d, iso_pix, jaw_Y_pix) in enumerate(
-            zip(self.masks, self.isocenters_pix, self.jaws_Y_pix)
-        ):
-            # Keypoint x: column-wise == dicom-z, keypoint y: row-wise == dicom-x
-            iso_kps_img = KeypointsOnImage(
-                [Keypoint(x=iso[2], y=iso[0]) for iso in iso_pix],
-                shape=mask2d.shape,
-            )
-
-            mask_aug, iso_kps_img_aug = resize.augment(
-                image=mask2d, keypoints=iso_kps_img
-            )  # pyright: ignore[reportGeneralTypeIssues]
-            masks_aug[i] = mask_aug
-            isos_kps_img_aug[i] = iso_kps_img_aug.to_xy_array()
-
-            # Only Y apertures need to be resized (X aperture along x/height)
-            jaw_Y_pix_aug = jaw_Y_pix * width_resize / mask2d.shape[1]
-            jaws_Y_pix_aug[i] = jaw_Y_pix_aug
-
-        assert (
-            masks_aug.shape[1] == masks_aug.shape[2]
-        ), "Cannot scale because 2D masks are not square matrices"
-
-        return (
-            masks_aug,
-            isos_kps_img_aug / width_resize,
-            self.jaws_X_pix / width_resize,
-            jaws_Y_pix_aug / width_resize,
-        )
-
-    def resize_scale_X_y(self):
-        """
-        Perform resize and scale and return data in an input/target format.
-        """
-        masks, isos, jaws_X, jaws_Y = self.resize_scale()
-        isos_flat = isos.reshape(self.num_patients, -1)
-        jaws_X_flat = jaws_X.reshape(self.num_patients, -1)
-        jaws_Y_flat = jaws_Y.reshape(self.num_patients, -1)
-        return masks, np.concatenate((isos_flat, jaws_X_flat, jaws_Y_flat), axis=1)
-
-    # TODO: implement inverse operations of resize_scale
-    def rotate_90(self) -> list[np.ndarray]:
-        """
-        Rotates each 2D mask in the instance variable `self.masks` 90 degrees counterclockwise.
-
-        Returns:
-            A list of NumPy arrays, where each array is a 2D mask rotated 90 degrees counterclockwise.
-        """
-
-        masks_rot = []
-
-        for mask2d in self.masks:
-            rot = iaa.Rot90(k=1, keep_size=False)
-            mask_rot = rot.augment_image(image=mask2d)
-
-            masks_rot.append(mask_rot)
-
-        return masks_rot
-
-    def resize(self):
+    def _resize(self):
         """Resize all masks to have a height of 512 pixels while preserving the aspect ratio.
         The width of the masks will be adjusted accordingly.
 
@@ -136,8 +50,11 @@ class Processing:
 
         width_resize = 512
 
-        masks_aug = np.zeros(shape=(self.num_patients, 512, width_resize))
-        isos_kps_img_aug = np.zeros(shape=(self.num_patients, self.iso_per_patient, 2))
+        masks_aug = []
+        isos_kps_img_aug3D = np.zeros(
+            shape=(self.num_patients, self.iso_per_patient, 3)
+        )
+
         jaws_Y_pix_aug = np.zeros_like(self.jaws_Y_pix)
 
         resize = iaa.Resize(size={"height": 512, "width": width_resize})
@@ -154,21 +71,23 @@ class Processing:
             mask_aug, iso_kps_img_aug = resize.augment(
                 image=mask2d, keypoints=iso_kps_img
             )  # pyright: ignore[reportGeneralTypeIssues]
-            masks_aug[i] = mask_aug
-            isos_kps_img_aug[i] = iso_kps_img_aug.to_xy_array()
+            masks_aug.append(mask_aug)
+            isos_kps_temp = iso_kps_img_aug.to_xy_array()
+
+            isos_kps_img_aug3D[i] = np.insert(isos_kps_temp, 1, iso_pix[:, 1], axis=1)
 
             # Only Y apertures need to be resized (X aperture along x/height)
             jaw_Y_pix_aug = jaw_Y_pix * width_resize / mask2d.shape[1]
             jaws_Y_pix_aug[i] = jaw_Y_pix_aug
 
         self.masks = masks_aug
-        self.isocenters_pix = isos_kps_img_aug
+        self.isocenters_pix = isos_kps_img_aug3D
         self.jaws_X_pix = self.jaws_X_pix
         self.jaws_Y_pix = jaws_Y_pix_aug
 
         return self
 
-    def scale(self):
+    def _scale(self):
         """
         Scale the isocenters_pix, jaws_X_pix, and jaws_Y_pix attributes of the object
         based on the size of the masks in the object.
@@ -190,6 +109,80 @@ class Processing:
         self.jaws_Y_pix = self.jaws_Y_pix / width_resize
 
         return self
+
+    def _rotation_90(self):
+        """
+        Rotates each 2D mask in the instance variable `self.masks` 90 degrees counterclockwise using the imgaug library.
+        Also rotates the corresponding isocenters in `self.isocenters_pix` by the same amount.
+
+        Returns:
+        --------
+        self: object
+            The modified object with rotated masks and isocenters.
+
+        Notes:
+        For a correct use of this function, we suggest to utilize it only after the _resize() function.
+        """
+
+        masks_rot = []
+        isos_kps_img_rot3D = np.zeros(
+            shape=(self.num_patients, self.iso_per_patient, 3)
+        )
+        rot = iaa.Rot90(k=1, keep_size=False)
+
+        for i, (mask2d, iso_pix) in enumerate(zip(self.masks, self.isocenters_pix)):
+            iso_kps_img = KeypointsOnImage(
+                [Keypoint(x=iso[0], y=iso[2]) for iso in iso_pix],
+                shape=mask2d.shape,
+            )
+            rot.augment()
+            img_rotated = rot.augment_image(image=mask2d)
+            iso_kps_img_rot = rot.augment_keypoints(iso_kps_img)
+            masks_rot.append(img_rotated)
+            isos_kps_temp_rot = (
+                iso_kps_img_rot.to_xy_array()  # pyright: ignore[reportOptionalMemberAccess, reportGeneralTypeIssues]
+            )
+            isos_kps_temp_rot[get_zero_row_idx(iso_pix)] = 0
+            isos_kps_img_rot3D[i] = np.insert(
+                isos_kps_temp_rot, 1, iso_pix[:, 1], axis=1
+            )
+
+        self.masks = masks_rot
+        self.isocenters_pix = isos_kps_img_rot3D
+
+        return self
+
+    def data_trasformation(self):
+        """
+        Applies three transformations to the data stored in the instance:
+
+        1. Resizes the data using the `resize` method.
+        2. Scales the data using the `scale` method.
+        3. Rotates the data by 90 degrees using the `rotation_90` method.
+
+        Returns:
+        -------
+        None
+        """
+        self._resize()._scale()._rotation_90()
+
+        return self
+
+    @property
+    def get_masks(self) -> list[np.ndarray]:
+        return self.masks
+
+    @property
+    def get_isocenters(self):
+        return self.isocenters_pix
+
+    @property
+    def get_x_jaws(self) -> np.ndarray:
+        return self.jaws_X_pix
+
+    @property
+    def get_y_jaws(self) -> np.ndarray:
+        return self.jaws_Y_pix
 
     # TODO: remove duplicate information of x and z coords.
     # For the moment keep all x- and z-coords of the isocenters:
