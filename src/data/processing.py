@@ -21,7 +21,6 @@ class Processing:
             jaws_X_pix (np.ndarray): Array of shape (num_patients, iso_per_patient, 2) containing the X-jaws apertures in pixel coordinates.
             jaws_Y_pix (np.ndarray): Array of shape (num_patients, iso_per_patient, 2) containing the Y-jaws apertures in pixel coordinates.
         """
-        
         self.masks = masks.copy()
         self.isocenters_pix = isocenters_pix.copy()
         self.jaws_X_pix = jaws_X_pix.copy()
@@ -45,7 +44,6 @@ class Processing:
         Note:
             Only the Y-jaw aperture needs to be resized as the X aperture is aligned to the height of the mask image.
         """
-
         assert np.all(
             [mask.shape[0] == 512 for mask in self.masks]
         ), "Not all masks have height=512"
@@ -99,11 +97,10 @@ class Processing:
 
         Returns:
             self: The modified object with scaled isocenters and jaw apertures.
-            
+
         Note:
             Scaling should be performed after Resize of the masks to square matrices.
         """
-        
         assert np.all(
             [mask.shape[0] == mask.shape[1] for mask in self.masks]
         ), "Cannot scale because 2D masks are not square matrices"
@@ -126,7 +123,6 @@ class Processing:
         Notes:
             For a correct use of this function, we suggest to utilize it only after the _resize() function.
         """
-
         masks_rot = []
         isos_kps_img_rot3D = np.zeros(
             shape=(self.num_patients, self.iso_per_patient, 3)
@@ -236,7 +232,6 @@ class Processing:
         Notes:
             For a correct use of this function, we suggest to utilize it only after the resize() function.
         """
-
         masks_rot = []
         isos_kps_img_rot3D = np.zeros(
             shape=(self.num_patients, self.iso_per_patient, 3)
@@ -322,7 +317,7 @@ class Processing:
                 ]
             )
             # Keypoint x: column-wise == dicom-z, keypoint y: row-wise == dicom-x
-            self._augmenting(
+            self._augment(
                 masks_aug,
                 isos_kps_img_aug3D,
                 jaws_Y_pix_aug,
@@ -382,7 +377,7 @@ class Processing:
             iso_pix[:, [2, 0]] = iso_pix[:, [0, 2]]
 
             # Keypoint x: column-wise == dicom-z, keypoint y: row-wise == dicom-x
-            self._augmenting(
+            self._augment(
                 masks_aug,
                 isos_kps_img_aug3D,
                 jaws_Y_pix_aug,
@@ -406,17 +401,17 @@ class Processing:
 
         return self
 
-    def _augmenting(
+    def _augment(
         self,
-        masks_aug,
-        isos_kps_img_aug3D,
-        jaws_Y_pix_aug,
-        i,
-        mask2d,
-        iso_pix,
-        jaw_Y_pix,
-        width_resize,
-        aug,
+        masks_aug: list[np.ndarray],
+        isos_kps_img_aug3D: np.ndarray,
+        jaws_Y_pix_aug: np.ndarray,
+        i: int,
+        mask2d: np.ndarray,
+        iso_pix: np.ndarray,
+        jaw_Y_pix: np.ndarray,
+        width_resize: int,
+        aug: iaa.Sequential,
     ):
         iso_kps_img = KeypointsOnImage(
             [Keypoint(x=iso[2], y=iso[0]) for iso in iso_pix],
