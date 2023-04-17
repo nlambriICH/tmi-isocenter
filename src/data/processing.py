@@ -21,6 +21,7 @@ class Processing:
             jaws_X_pix (np.ndarray): Array of shape (num_patients, iso_per_patient, 2) containing the X-jaws apertures in pixel coordinates.
             jaws_Y_pix (np.ndarray): Array of shape (num_patients, iso_per_patient, 2) containing the Y-jaws apertures in pixel coordinates.
         """
+        
         self.masks = masks.copy()
         self.isocenters_pix = isocenters_pix.copy()
         self.jaws_X_pix = jaws_X_pix.copy()
@@ -30,8 +31,7 @@ class Processing:
         self.original_sizes = [mask.shape[1] for mask in masks]
 
     def resize(self, width_resize=512):
-        """Resize all masks to have a height of 512 pixels while preserving the aspect ratio.
-        The width of the masks will be adjusted accordingly.
+        """Resize all masks to a width specified by `width_resize`. Isocenter positions and jaw apertures are transformed accordingly.
 
         Args:
             width_resize (int): The desired width of the masks after resizing. Default is 512.
@@ -40,12 +40,10 @@ class Processing:
             AssertionError: If not all masks have a height of 512 pixels.
 
         Returns:
-            None.
+            self: The modified object with rotated masks and isocenters.
 
-        This method uses the `iaa.Resize` class from the imgaug library to perform the resizing
-        operation. The isocenters and Y-jaw aperture positions are adjusted accordingly.
-        Only the Y-jaw aperture needs to be resized as the X aperture is aligned with the
-        height dimension of the mask.
+        Note:
+            Only the Y-jaw aperture needs to be resized as the X aperture is aligned to the height of the mask image.
         """
 
         assert np.all(
@@ -76,7 +74,7 @@ class Processing:
             masks_aug.append(mask_aug)
             isos_kps_temp = iso_kps_img_aug.to_xy_array()
 
-            # Swap the columns to return at the original dicom's reference sistem
+            # Swap columns to original dicom coordinate system
             isos_kps_temp[:, [1, 0]] = isos_kps_temp[:, [0, 1]]
 
             isos_kps_img_aug3D[i] = np.insert(isos_kps_temp, 1, iso_pix[:, 1], axis=1)
@@ -94,15 +92,18 @@ class Processing:
 
     def scale(self):
         """
-        Scale the isocenters_pix, jaws_X_pix, and jaws_Y_pix attributes of the object
-        based on the size of the masks in the object.
+        Scale isocenters_pix, jaws_X_pix, and jaws_Y_pix based on the width of the masks.
 
         Raises:
-        - AssertionError: If any 2D mask in the object is not a square matrix.
+            AssertionError: If any 2D mask in the object is not a square matrix.
 
         Returns:
-        - None
+            self: The modified object with scaled isocenters and jaw apertures.
+            
+        Note:
+            Scaling should be performed after Resize of the masks to square matrices.
         """
+        
         assert np.all(
             [mask.shape[0] == mask.shape[1] for mask in self.masks]
         ), "Cannot scale because 2D masks are not square matrices"
@@ -117,13 +118,10 @@ class Processing:
 
     def rotate_90(self):
         """
-        Rotates each 2D mask in the instance variable `self.masks` 90 degrees counterclockwise using the imgaug library.
-        Also rotates the corresponding isocenters in `self.isocenters_pix` by the same amount.
+        Rotate all masks and isocenters by 90 degrees counterclockwise.
 
         Returns:
-        --------
-        self: object
-            The modified object with rotated masks and isocenters.
+        self: The modified object with rotated masks and isocenters.
 
         Notes:
             For a correct use of this function, we suggest to utilize it only after the _resize() function.
@@ -158,19 +156,13 @@ class Processing:
 
     def inverse_resize(self):
         """
-        Resize every mask to its original height while preserving the aspect ratio.
-        The width of the masks will be adjusted accordingly.
-
-        This method uses the `iaa.Resize` class from the imgaug library to perform the resizing
-        operation. The isocenters and Y-jaw aperture positions are adjusted accordingly.
-        Only the Y-jaw aperture needs to be resized as the X aperture is aligned with the
-        height dimension of the mask.
+        Resize every mask to its original width. Isocenter positions and jaw apertures are transformed accordingly.
 
         Raises:
             AssertionError: If not all masks have a height of 512 pixels.
 
         Returns:
-            None.
+            self: The modified object with rotated masks and isocenters.
         """
         assert np.all(
             [mask.shape[0] == 512 for mask in self.masks]
@@ -197,7 +189,7 @@ class Processing:
             )  # pyright: ignore[reportGeneralTypeIssues]
             masks_aug.append(mask_aug)
             isos_kps_temp = iso_kps_img_aug.to_xy_array()
-            # swap the columns to return at the original dicom's reference sistem
+            # Swap columns to original dicom coordinate system
             isos_kps_temp[:, [1, 0]] = isos_kps_temp[:, [0, 1]]
             isos_kps_img_aug3D[i] = np.insert(isos_kps_temp, 1, iso_pix[:, 1], axis=1)
 
@@ -214,14 +206,13 @@ class Processing:
 
     def inverse_scale(self):
         """
-        Scale the isocenters_pix, jaws_X_pix, and jaws_Y_pix attributes of the object
-        based on the size of the masks in the object.
+        Transform isocenters_pix, jaws_X_pix, and jaws_Y_pix to the original scale based on the width of the masks.
 
         Raises:
-        - AssertionError: If any 2D mask in the object is not a square matrix.
+            AssertionError: If any 2D mask in the object is not a square matrix.
 
         Returns:
-        - None
+            self: The modified object with rotated masks and isocenters.
         """
         assert np.all(
             [mask.shape[0] == mask.shape[1] for mask in self.masks]
@@ -237,16 +228,13 @@ class Processing:
 
     def inverse_rotate_90(self):
         """
-        Rotates each 2D mask in the instance variable `self.masks` 90 degrees clockwise using the imgaug library.
-        Also rotates the corresponding isocenters in `self.isocenters_pix` by the same amount.
+        Rotate all masks and isocenters by 90 degrees clockwise.
 
         Returns:
-        --------
-        self: object
-            The modified object with rotated masks and isocenters.
+            self: The modified object with rotated masks and isocenters.
 
         Notes:
-        For a correct use of this function, we suggest to utilize it only after the resize() function.
+            For a correct use of this function, we suggest to utilize it only after the resize() function.
         """
 
         masks_rot = []
@@ -256,7 +244,7 @@ class Processing:
         rot = iaa.Rot90(k=-1, keep_size=False)
 
         for i, (mask2d, iso_pix) in enumerate(zip(self.masks, self.isocenters_pix)):
-            # swap the columns to return at the original dicom's reference sistem
+            # Swap columns to original dicom coordinate system
             iso_pix[:, [2, 0]] = iso_pix[:, [0, 2]]
             iso_kps_img = KeypointsOnImage(
                 [Keypoint(x=iso[2], y=iso[0]) for iso in iso_pix],
@@ -269,7 +257,7 @@ class Processing:
                 iso_kps_img_rot.to_xy_array()  # pyright: ignore[reportOptionalMemberAccess, reportGeneralTypeIssues]
             )
             isos_kps_temp_rot[get_zero_row_idx(iso_pix)] = 0
-            # swap the columns to return at the original dicom's reference sistem
+            # Swap columns to original dicom coordinate system
             isos_kps_temp_rot[:, [1, 0]] = isos_kps_temp_rot[:, [0, 1]]
             isos_kps_img_rot3D[i] = np.insert(
                 isos_kps_temp_rot, 1, iso_pix[:, 1], axis=1
@@ -298,20 +286,16 @@ class Processing:
 
     def trasform(self):
         """
-
-        Applies an augmentation pipeline to the masks, isocenters, and jaw positions stored in the instance attributes.
-        The pipeline includes rotation, scaling and resizing operations to obtain 512x512 vertical masks, and corresponding transformations
-        of the isocenters and jaw positions. The resulting augmented data is stored back in the instance attributes.
-
+        Sequence transformation composed of resize, 90 degrees CCW rotation, and scaling of masks and keypoints (isocenters and jaw apertures).
 
         Raises:
             AssertionError: If any of the masks does not have a height of 512 pixels.
 
         Returns:
-            None.
+            self: The modified object with rotated masks and isocenters.
 
         Notes:
-            For a correct use of this function, we suggest to utilize it only to trasform orizontal images in vertical ones.
+            This function expects as input masks where height and width correspond to x-axis and z-axis in the patient's coord system ("horizontal" image).
         """
         assert np.all(
             [mask.shape[0] == 512 for mask in self.masks]
@@ -361,19 +345,16 @@ class Processing:
 
     def inverse_trasform(self):
         """
-
-        Applies an augmentation pipeline to the masks, isocenters, and jaw positions stored in the instance attributes.
-        The pipeline includes rotation and resizing operations to reset the masks, the isocenters and the jaw powitions in the original shape, and corresponding transformations
-        of the isocenters and jaw positions. The resulting augmented data is stored back in the instance attributes.
+        Sequence transformation composed of scaling, 90 degrees CW rotation, and resize to recover the original values of masks and keypoints (isocenters and jaw apertures).
 
         Raises:
             AssertionError: If any of the masks does not have a height of 512 pixels.
 
         Returns:
-            None.
+            self: The modified object with rotated masks and isocenters.
 
         Notes:
-            For a correct use of this function, we suggest to utilize it only to trasform vertical images in orizontal ones.
+            This function expects as input masks where height and width correspond to z-axis and x-axis in the patient's coord system ("vertical" image).
         """
         assert np.all(
             [mask.shape[0] == 512 for mask in self.masks]
@@ -397,7 +378,7 @@ class Processing:
                     iaa.Resize(size={"height": 512, "width": width_resize}),
                 ]
             )
-            # swap the columns to return at the original dicom's reference sistem
+            # Swap columns to original dicom coordinate system
             iso_pix[:, [2, 0]] = iso_pix[:, [0, 2]]
 
             # Keypoint x: column-wise == dicom-z, keypoint y: row-wise == dicom-x
