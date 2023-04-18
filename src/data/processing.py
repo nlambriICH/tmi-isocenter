@@ -2,6 +2,7 @@ import numpy as np
 import imgaug.augmenters as iaa
 from imgaug.augmentables import Keypoint, KeypointsOnImage
 from src.utils.field_geometry_transf import get_zero_row_idx
+import os
 
 
 class Processing:
@@ -430,6 +431,30 @@ class Processing:
         # Only Y apertures need to be resized (X aperture along x/height)
         jaw_Y_pix_aug = jaw_Y_pix * width_resize / mask2d.shape[1]
         jaws_Y_pix_aug[i] = jaw_Y_pix_aug
+
+    def save_data(self):
+        """
+        Saves the trasformed masks, isocenters, jaws positions, and angles in the interim folder of the tmi_isocenter/data directory.
+        If the interim folder does not exist, it is created.
+
+        Returns:
+            self: The object instance.
+        """
+
+        if not os.path.exists(r"\tmi_isocenter\data\interim"):
+            os.makedirs(r"\tmi_isocenter\data\interim")
+
+        np.savez(
+            r"\tmi_isocenter\data\interim\masks2D.npz", *self.masks
+        )  # unpack the list to pass the mask2D arrays as positional arguments
+        np.save(r"\tmi_isocenter\data\interim\isocenters_pix.npy", self.isocenters_pix)
+        np.save(r"\tmi_isocenter\data\interim\jaws_X_pix.npy", self.jaws_X_pix)
+        np.save(r"\tmi_isocenter\data\interim\jaws_Y_pix.npy", self.jaws_Y_pix)
+        np.save(
+            r"\tmi_isocenter\data\interim\angles.npy",
+            np.load(r"\tmi_isocenter\data\raw\angles.npy"),
+        )
+        return self
 
     # TODO: remove duplicate information of x and z coords.
     # For the moment keep all x- and z-coords of the isocenters:
