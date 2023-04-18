@@ -14,6 +14,7 @@ class Processing:
         isocenters_pix: np.ndarray,
         jaws_X_pix: np.ndarray,
         jaws_Y_pix: np.ndarray,
+        coll_angles: np.ndarray,
     ) -> None:
         """
         Args:
@@ -29,6 +30,7 @@ class Processing:
         self.num_patients = len(masks)
         self.iso_per_patient = isocenters_pix.shape[1]
         self.original_sizes = [mask.shape[1] for mask in masks]
+        self.coll_angles = coll_angles.copy()
 
     def resize(self, width_resize=512):
         """Resize all masks to a width specified by `width_resize`. Isocenter positions and jaw apertures are transformed accordingly.
@@ -446,10 +448,7 @@ class Processing:
         np.save(r"\tmi_isocenter\data\interim\isocenters_pix.npy", self.isocenters_pix)
         np.save(r"\tmi_isocenter\data\interim\jaws_X_pix.npy", self.jaws_X_pix)
         np.save(r"\tmi_isocenter\data\interim\jaws_Y_pix.npy", self.jaws_Y_pix)
-        np.save(
-            r"\tmi_isocenter\data\interim\angles.npy",
-            np.load(r"\tmi_isocenter\data\raw\angles.npy"),
-        )
+        np.save(r"\tmi_isocenter\data\interim\angles.npy", self.coll_angles)
         return self
 
     # TODO: remove duplicate information of x and z coords.
@@ -470,3 +469,20 @@ class Processing:
             raise ValueError(
                 f"Expected an array of ndim == 2 or 3, but got an array with ndim={iso_kps_img.ndim}"
             )
+
+
+if __name__ == "__main__":
+    with np.load("/tmi_isocenter/data/raw/masks2D.npz") as npz_masks2d:
+        masks = list(npz_masks2d.values())
+    isocenters_pix = np.load("/tmi_isocenter/data/raw/isocenters_pix.npy")
+    jaws_X_pix = np.load("/tmi_isocenter/data/raw/jaws_X_pix.npy")
+    jaws_Y_pix = np.load("/tmi_isocenter/data/raw/jaws_Y_pix.npy")
+    coll_angles = np.load("/tmi_isocenter/data/raw/angles.npy")
+    process = Processing(
+        masks,
+        isocenters_pix,
+        jaws_X_pix,
+        jaws_Y_pix,
+        coll_angles,
+    )
+    process.save_data()
