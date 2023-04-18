@@ -122,7 +122,7 @@ class Processing:
         self: The modified object with rotated masks and isocenters.
 
         Notes:
-            For a correct use of this function, we suggest to utilize it only after the _resize() function.
+            For a correct use of this function, we suggest to utilize it only with orizontal images.
         """
         masks_rot = []
         isos_kps_img_rot3D = np.zeros(
@@ -390,15 +390,11 @@ class Processing:
                 aug,
             )
             isos_kps_img_aug3D[i][:, [2, 0]] = isos_kps_img_aug3D[i][:, [0, 2]]
-            iso_pix[:, [2, 0]] = iso_pix[:, [0, 2]]
 
         self.masks = masks_aug
         self.isocenters_pix = isos_kps_img_aug3D
         self.jaws_X_pix = self.jaws_X_pix
         self.jaws_Y_pix = jaws_Y_pix_aug
-
-        if self.get_masks[0].shape[0] == self.get_masks[0].shape[1]:
-            self.scale()
 
         return self
 
