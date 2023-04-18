@@ -1,3 +1,4 @@
+from typing import Literal
 import numpy as np
 from pydicom import Dataset
 from rt_utils.image_helper import (
@@ -82,7 +83,7 @@ def transform_field_geometry(
     iso_orig: np.ndarray,
     jaw_X_orig: np.ndarray,
     jaw_Y_orig: np.ndarray,
-    from_to: str = "pat_pix",
+    from_to: Literal["pat_pix", "pix_pat"] = "pat_pix",
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Transform the field geometry from patient's coordinate system to pixel space or vice versa.
