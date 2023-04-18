@@ -432,11 +432,10 @@ class Processing:
 
     def save_data(self):
         """
-        Saves the trasformed masks, isocenters, jaws positions, and angles in the interim folder of the tmi_isocenter/data directory.
-        If the interim folder does not exist, it is created.
+        Save processed masks, isocenters, jaws positions, and angles in the interim folder.
 
         Returns:
-            self: The object instance.
+            None.
         """
 
         if not os.path.exists(r"\tmi_isocenter\data\interim"):
@@ -449,7 +448,6 @@ class Processing:
         np.save(r"\tmi_isocenter\data\interim\jaws_X_pix.npy", self.jaws_X_pix)
         np.save(r"\tmi_isocenter\data\interim\jaws_Y_pix.npy", self.jaws_Y_pix)
         np.save(r"\tmi_isocenter\data\interim\angles.npy", self.coll_angles)
-        return self
 
     # TODO: remove duplicate information of x and z coords.
     # For the moment keep all x- and z-coords of the isocenters:
@@ -472,17 +470,19 @@ class Processing:
 
 
 if __name__ == "__main__":
-    with np.load("/tmi_isocenter/data/raw/masks2D.npz") as npz_masks2d:
+    with np.load(r"\tmi_isocenter\data\raw\masks2D.npz") as npz_masks2d:
         masks = list(npz_masks2d.values())
-    isocenters_pix = np.load("/tmi_isocenter/data/raw/isocenters_pix.npy")
-    jaws_X_pix = np.load("/tmi_isocenter/data/raw/jaws_X_pix.npy")
-    jaws_Y_pix = np.load("/tmi_isocenter/data/raw/jaws_Y_pix.npy")
-    coll_angles = np.load("/tmi_isocenter/data/raw/angles.npy")
-    process = Processing(
+    isocenters_pix = np.load(r"\tmi_isocenter\data\raw\isocenters_pix.npy")
+    jaws_X_pix = np.load(r"\tmi_isocenter\data\raw\jaws_X_pix.npy")
+    jaws_Y_pix = np.load(r"\tmi_isocenter\data\raw\jaws_Y_pix.npy")
+    coll_angles = np.load(r"\tmi_isocenter\data\raw\angles.npy")
+
+    processing = Processing(
         masks,
         isocenters_pix,
         jaws_X_pix,
         jaws_Y_pix,
         coll_angles,
     )
-    process.save_data()
+
+    processing.save_data()
