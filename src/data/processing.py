@@ -438,16 +438,16 @@ class Processing:
             None.
         """
 
-        if not os.path.exists(r"\tmi_isocenter\data\interim"):
-            os.makedirs(r"\tmi_isocenter\data\interim")
+        if not os.path.exists(r"\tmi-isocenter\data\interim"):
+            os.makedirs(r"\tmi-isocenter\data\interim")
 
         np.savez(
-            r"\tmi_isocenter\data\interim\masks2D.npz", *self.masks
+            r"\tmi-isocenter\data\interim\masks2D.npz", *self.masks
         )  # unpack the list to pass the mask2D arrays as positional arguments
-        np.save(r"\tmi_isocenter\data\interim\isocenters_pix.npy", self.isocenters_pix)
-        np.save(r"\tmi_isocenter\data\interim\jaws_X_pix.npy", self.jaws_X_pix)
-        np.save(r"\tmi_isocenter\data\interim\jaws_Y_pix.npy", self.jaws_Y_pix)
-        np.save(r"\tmi_isocenter\data\interim\angles.npy", self.coll_angles)
+        np.save(r"\tmi-isocenter\data\interim\isocenters_pix.npy", self.isocenters_pix)
+        np.save(r"\tmi-isocenter\data\interim\jaws_X_pix.npy", self.jaws_X_pix)
+        np.save(r"\tmi-isocenter\data\interim\jaws_Y_pix.npy", self.jaws_Y_pix)
+        np.save(r"\tmi-isocenter\data\interim\angles.npy", self.coll_angles)
 
     # TODO: remove duplicate information of x and z coords.
     # For the moment keep all x- and z-coords of the isocenters:
@@ -470,12 +470,12 @@ class Processing:
 
 
 if __name__ == "__main__":
-    with np.load(r"\tmi_isocenter\data\raw\masks2D.npz") as npz_masks2d:
+    with np.load(r"\tmi-isocenter\data\raw\masks2D.npz") as npz_masks2d:
         masks = list(npz_masks2d.values())
-    isocenters_pix = np.load(r"\tmi_isocenter\data\raw\isocenters_pix.npy")
-    jaws_X_pix = np.load(r"\tmi_isocenter\data\raw\jaws_X_pix.npy")
-    jaws_Y_pix = np.load(r"\tmi_isocenter\data\raw\jaws_Y_pix.npy")
-    coll_angles = np.load(r"\tmi_isocenter\data\raw\angles.npy")
+    isocenters_pix = np.load(r"\tmi-isocenter\data\raw\isocenters_pix.npy")
+    jaws_X_pix = np.load(r"\tmi-isocenter\data\raw\jaws_X_pix.npy")
+    jaws_Y_pix = np.load(r"\tmi-isocenter\data\raw\jaws_Y_pix.npy")
+    coll_angles = np.load(r"\tmi-isocenter\data\raw\angles.npy")
 
     processing = Processing(
         masks,
