@@ -271,15 +271,15 @@ class Processing:
         return self.masks
 
     @property
-    def get_isocenters(self):
+    def get_isocenters_pix(self) -> np.ndarray:
         return self.isocenters_pix
 
     @property
-    def get_x_jaws(self) -> np.ndarray:
+    def get_jaws_X_pix(self) -> np.ndarray:
         return self.jaws_X_pix
 
     @property
-    def get_y_jaws(self) -> np.ndarray:
+    def get_jaws_Y_pix(self) -> np.ndarray:
         return self.jaws_Y_pix
 
     def trasform(self):
@@ -391,7 +391,7 @@ class Processing:
                 width_resize,
                 aug,
             )
-            isos_kps_img_aug3D[i][:, [2, 0]] = isos_kps_img_aug3D[i][:, [0, 2]]
+            isos_kps_img_aug3D[i, :, [2, 0]] = isos_kps_img_aug3D[i, :, [0, 2]]
 
         self.masks = masks_aug
         self.isocenters_pix = isos_kps_img_aug3D
@@ -485,4 +485,4 @@ if __name__ == "__main__":
         coll_angles,
     )
 
-    processing.save_data()
+    processing.trasform().save_data()
