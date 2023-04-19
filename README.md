@@ -1,4 +1,4 @@
-# tmi_isocenter
+# tmi-isocenter
 
 ## Development
 
