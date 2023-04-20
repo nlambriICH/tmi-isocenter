@@ -12,7 +12,7 @@ class Dataset:
     def __init__(self) -> None:
         with np.load(r"data\interim\masks2D.npz") as npz_masks2d:  # shape=(N, 512, z)
             try:
-                self.masks2d = np.array(npz_masks2d.values())
+                self.masks2d = np.array(list(npz_masks2d.values()))
             except ValueError:
                 traceback.print_exc()
                 print(
