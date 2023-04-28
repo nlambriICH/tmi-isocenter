@@ -79,7 +79,7 @@ class Dataset:
 
         train_idx, val_idx = next(
             StratifiedShuffleSplit(n_splits=1, test_size=0.1).split(
-                np.zeros_like(train_idx), self.angle_class[train_idx]
+                np.zeros_like(train_idx), self.angle_class[train_idx - 1]
             )
         )
 

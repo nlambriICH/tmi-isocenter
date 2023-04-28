@@ -25,7 +25,7 @@ if __name__ == "__main__":
         y_cls_test,
     ) = tuple(
         map(
-            torch.from_numpy,
+            torch.Tensor,
             (
                 masks_aug[train_index],
                 y_reg[train_index],
