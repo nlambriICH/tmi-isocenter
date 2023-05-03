@@ -1,10 +1,12 @@
 import os
+import torch
 from src.data.processing import Processing
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+import pandas as pd
 
 # 30 Epochs training
 
@@ -15,10 +17,7 @@ isocenters_pix = np.load(r"data\raw\isocenters_pix.npy")
 jaws_X_pix = np.load(r"data\raw\jaws_X_pix.npy")
 jaws_Y_pix = np.load(r"data\raw\jaws_Y_pix.npy")
 coll_angles = np.load(r"data\raw\angles.npy")
-
-slice_thickness = 5.0
-pix_spacing = 1.171875
-aspect_ratio = slice_thickness / pix_spacing
+df_patient_info = pd.read_csv(r"data\patient_info.csv").sort_values(by="PlanDate")
 
 
 def extract_data(output):
@@ -63,9 +62,12 @@ def plot_fields(
     jaw_X: np.ndarray,
     jaw_Y: np.ndarray,
     coll_angles: np.ndarray,
+    slice_thickness: float,
+    pix_spacing: float,
     color: str = "r",
     unit_measure: str = "pix",
 ) -> None:
+    aspect_ratio = slice_thickness / pix_spacing
     for i, (iso, X, Y, angle) in enumerate(
         zip(
             iso_pixel,
@@ -114,6 +116,9 @@ def plot_fields(
 
 
 def plot_img(patient_idx, output, path) -> None:
+    pix_spacing = df_patient_info.iloc[patient_idx, -1]
+    slice_thickness = df_patient_info.iloc[patient_idx, -2]
+
     isocenters_hat, jaws_X_pix_hat, jaws_Y_pix_hat = extract_data(output)
     processing = Processing(
         masks,
@@ -147,6 +152,26 @@ def plot_img(patient_idx, output, path) -> None:
     processing.inverse_resize()
 
     # Start plot
+    # overlap_plot(patient_idx, path, processing, test, pix_spacing, slice_thickness,)
+    single_plot(
+        patient_idx,
+        path,
+        processing,
+        test,
+        pix_spacing,
+        slice_thickness,
+    )
+
+
+def overlap_plot(
+    patient_idx,
+    path,
+    processing,
+    test,
+    pix_spacing,
+    slice_thickness,
+):
+    aspect_ratio = slice_thickness / pix_spacing
     plt.imshow(processing.masks[patient_idx], cmap="gray", aspect=1 / aspect_ratio)
     plt.contourf(processing.masks[patient_idx], alpha=0.25)
     plt.scatter(
@@ -165,6 +190,8 @@ def plot_img(patient_idx, output, path) -> None:
         test.jaws_X_pix[0],
         test.jaws_Y_pix[0],
         test.coll_angles,
+        slice_thickness,
+        pix_spacing,
     )
     plot_fields(
         plt.gca(),
@@ -172,6 +199,8 @@ def plot_img(patient_idx, output, path) -> None:
         processing.jaws_X_pix[patient_idx],
         processing.jaws_Y_pix[patient_idx],
         coll_angles[patient_idx],
+        slice_thickness,
+        pix_spacing,
         "b",
     )
     red_patch = mpatches.Patch(color="red", label="Pred")
@@ -181,8 +210,63 @@ def plot_img(patient_idx, output, path) -> None:
     if not os.path.exists(os.path.join(path, "predict_img")):
         os.makedirs(os.path.join(path, "predict_img"))
     plt.savefig(
-        os.path.join(path, "predict_img", f"output_test_{patient_idx}")
-    )  # join del path to do
+        os.path.join(path, "predict_img", f"output_test_{patient_idx}"), dpi=2000
+    )
+    plt.close()
+
+
+def single_plot(
+    patient_idx,
+    path,
+    processing,
+    test,
+    pix_spacing,
+    slice_thickness,
+):
+    aspect_ratio = slice_thickness / pix_spacing
+    plt.imshow(processing.masks[patient_idx], cmap="gray", aspect=1 / aspect_ratio)
+    plt.contourf(processing.masks[patient_idx], alpha=0.25)
+    plt.scatter(
+        test.isocenters_pix[0, :, 2], test.isocenters_pix[0, :, 0], color="red", s=10
+    )
+    plot_fields(
+        plt.gca(),
+        test.isocenters_pix[0],
+        test.jaws_X_pix[0],
+        test.jaws_Y_pix[0],
+        test.coll_angles,
+        slice_thickness,
+        pix_spacing,
+    )
+    if not os.path.exists(os.path.join(path, "predict_img")):
+        os.makedirs(os.path.join(path, "predict_img"))
+    plt.savefig(
+        os.path.join(path, "predict_img", f"output_test_{patient_idx}"), dpi=2000
+    )
+    plt.close()
+
+    plt.imshow(processing.masks[patient_idx], cmap="gray", aspect=1 / aspect_ratio)
+    plt.contourf(processing.masks[patient_idx], alpha=0.25)
+    plt.scatter(
+        processing.isocenters_pix[patient_idx, :, 2],
+        processing.isocenters_pix[patient_idx, :, 0],
+        color="blue",
+        s=10,
+    )
+    plot_fields(
+        plt.gca(),
+        processing.isocenters_pix[patient_idx],
+        processing.jaws_X_pix[patient_idx],
+        processing.jaws_Y_pix[patient_idx],
+        coll_angles[patient_idx],
+        slice_thickness,
+        pix_spacing,
+        "b",
+    )
+    if not os.path.exists(os.path.join(path, "real_img")):
+        os.makedirs(os.path.join(path, "real_img"))
+    plt.savefig(os.path.join(path, "real_img", f"output_test_{patient_idx}"), dpi=2000)
+    plt.close()
 
 
 if __name__ == "__main__":
@@ -273,6 +357,6 @@ if __name__ == "__main__":
         -2.8790e-03,
         -1.2458e-03,
     ]
-
-    path = "d:\\trash\\tmi-isocenter\\lightning_logs\\version_1"
+    output = torch.Tensor(output)
+    path = "d:/trash/tmi-isocenter/lightning_logs/test"
     plot_img(patient_idx, output, path)
