@@ -8,19 +8,35 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import pandas as pd
 
-# 30 Epochs training
 
-# Non ha senso importare i dati ogni volta, ma dove lo posso fare?
 with np.load(r"data\raw\masks2D.npz") as npz_masks2d:
     masks = list(npz_masks2d.values())
 isocenters_pix = np.load(r"data\raw\isocenters_pix.npy")
 jaws_X_pix = np.load(r"data\raw\jaws_X_pix.npy")
 jaws_Y_pix = np.load(r"data\raw\jaws_Y_pix.npy")
 coll_angles = np.load(r"data\raw\angles.npy")
-df_patient_info = pd.read_csv(r"data\patient_info.csv").sort_values(by="PlanDate")
+df_patient_info = pd.read_csv(r"data\patient_info.csv")
 
 
-def extract_data(output):
+def extract_data(output: torch.Tensor):
+    """
+    Reorganize the data from a given output torch.Tensor, returns them in three separate 2D arrays.
+
+    Parameters:
+        output : torch.Tensor
+            A 1D NumPy array containing the data to be extracted. The expected length of this array is 84.
+
+    Returns:
+        tuple of 3 numpy.ndarray
+            A tuple containing the following 2D NumPy arrays:
+            - isocenters_hat: a 12x3 array containing the extracted isocenter positions in x, y, and z dimensions.
+            - jaws_X_pix_hat: a 12x2 array containing the extracted X-jaw positions in left and right directions.
+            - jaws_Y_pix_hat: a 12x2 array containing the extracted Y-jaw positions in inferior and superior directions.
+
+    Notes:
+    ------
+    - The function assumes that the `output` array is of length 84, which is the expected size of the relevant data.
+    """
     isocenters_hat = np.zeros((12, 3))
     jaws_X_pix_hat = np.zeros((12, 2))
     jaws_Y_pix_hat = np.zeros((12, 2))
@@ -42,6 +58,21 @@ def add_rectangle_patch(
     angle: float,
     color: str = "r",
 ) -> None:
+    """
+    Adds a rectangle patch to the given Matplotlib Axes object.
+
+    Parameters:
+        ax (plt.Axes): The Matplotlib Axes object to add the rectangle patch to.
+        anchor (tuple[float, float]): The (x, y) coordinates of the bottom-left corner of the rectangle.
+        width (float): The width of the rectangle.
+        height (float): The height of the rectangle.
+        rotation_point (tuple[float, float]): The (x, y) coordinates of the point around which to rotate the rectangle.
+        angle (float): The angle (in degrees) by which to rotate the rectangle around the rotation point.
+        color (str, optional): The color of the rectangle's edge. Defaults to "r" (red).
+
+    Returns:
+        None
+    """
     ax.add_patch(
         Rectangle(
             anchor,
@@ -67,6 +98,28 @@ def plot_fields(
     color: str = "r",
     unit_measure: str = "pix",
 ) -> None:
+    """
+    Plots rectangular fields on a given Matplotlib Axes object, based on information about each field's isocenter,
+    jaw position, and collimator angle.
+
+    Parameters:
+        ax (plt.Axes): The Matplotlib Axes object to plot the fields on.
+        iso_pixel (np.ndarray): A 2D NumPy array containing the (row, col, depth) coordinates of each field's isocenter.
+        jaw_X (np.ndarray): A 2D NumPy array containing the X positions of each field's jaw edges.
+        jaw_Y (np.ndarray): A 2D NumPy array containing the Y positions of each field's jaw edges.
+        coll_angles (np.ndarray): A 1D NumPy array containing the collimator angles of each field.
+        slice_thickness (float): The thickness of the slice being plotted (in units of the `unit_measure` parameter).
+        pix_spacing (float): The pixel spacing of the slice being plotted (in units of the `unit_measure` parameter).
+        color (str, optional): The color of the rectangle's edge. Defaults to "r" (red).
+        unit_measure (str, optional): The units of the `slice_thickness` and `pix_spacing` parameters.
+            Must be "pix" or "mm". Defaults to "pix".
+
+    Returns:
+        None
+
+    Raises:
+        ValueError: If `unit_measure` is not "pix" or "mm".
+    """
     aspect_ratio = slice_thickness / pix_spacing
     for i, (iso, X, Y, angle) in enumerate(
         zip(
@@ -115,7 +168,25 @@ def plot_fields(
         )
 
 
-def plot_img(patient_idx, output, path) -> None:
+def plot_img(patient_idx: int, output: torch.Tensor, path: str) -> None:
+    """
+    Generates and saves a plot of two images for a given patient: the original image and a transformed image.
+
+    Parameters:
+        patient_idx : int
+            The index of the patient to plot.
+        output : torch.Tensor
+            A 1D NumPy array containing the output of a model for the specified patient.
+        path : str
+            The lightning's path where the plot image will be saved.
+
+    Returns:
+        None
+
+    Notes:
+    ------
+    - The function calls the `extract_data` function to extract relevant data from the output array.
+    """
     pix_spacing = df_patient_info.iloc[patient_idx, -1]
     slice_thickness = df_patient_info.iloc[patient_idx, -2]
 
@@ -147,30 +218,47 @@ def plot_img(patient_idx, output, path) -> None:
     test.original_sizes = original_shape
 
     test.inverse_scale()
-    # test.inverse_rotate_90()  ?
+    test.inverse_rotate_90()
     test.inverse_resize()
     processing.inverse_resize()
 
     # Start plot
     # overlap_plot(patient_idx, path, processing, test, pix_spacing, slice_thickness,)
-    single_plot(
+    separate_plot(
         patient_idx,
         path,
         processing,
         test,
-        pix_spacing,
-        slice_thickness,
+        pix_spacing,  # pyright: ignore[reportGeneralTypeIssues]
+        slice_thickness,  # pyright: ignore[reportGeneralTypeIssues]
     )
 
 
 def overlap_plot(
-    patient_idx,
-    path,
-    processing,
-    test,
-    pix_spacing,
-    slice_thickness,
-):
+    patient_idx: int,
+    path: str,
+    processing: Processing,
+    test: Processing,
+    pix_spacing: float,
+    slice_thickness: float,
+) -> None:
+    """
+    Plot the predicted and true isocenters, jaws, and mask of a single patient, overlaying the predicted
+    isocenters and jaws on the true data.
+
+    Args:
+    - patient_idx (int): Index of the patient to plot.
+    - path (str): Path where to save the plot.
+    - processing (Processing object): Processing object containing the true mask, isocenters, jaws, and
+    collimator angles.
+    - test (Processing object): Processing object containing the predicted isocenters, jaws, and collimator
+    angles.
+    - pix_spacing (float): Pixel spacing of the CT images.
+    - slice_thickness (float): Slice thickness of the CT images.
+
+    Returns:
+    - None: The function saves the plot to disk, then closes it.
+    """
     aspect_ratio = slice_thickness / pix_spacing
     plt.imshow(processing.masks[patient_idx], cmap="gray", aspect=1 / aspect_ratio)
     plt.contourf(processing.masks[patient_idx], alpha=0.25)
@@ -215,14 +303,31 @@ def overlap_plot(
     plt.close()
 
 
-def single_plot(
-    patient_idx,
-    path,
-    processing,
-    test,
-    pix_spacing,
-    slice_thickness,
-):
+def separate_plot(
+    patient_idx: int,
+    path: str,
+    processing: Processing,
+    test: Processing,
+    pix_spacing: float,
+    slice_thickness: float,
+) -> None:
+    """
+    Plot the predicted and true isocenters, jaws, and mask of a single patient, in two different files png,
+    one for the real and another for the predicted one.
+
+    Args:
+    - patient_idx (int): Index of the patient to plot.
+    - path (str): Path where to save the plot.
+    - processing (Processing object): Processing object containing the true mask, isocenters, jaws, and
+    collimator angles.
+    - test (Processing object): Processing object containing the predicted isocenters, jaws, and collimator
+    angles.
+    - pix_spacing (float): Pixel spacing of the CT images.
+    - slice_thickness (float): Slice thickness of the CT images.
+
+    Returns:
+    - None: The function saves the plot to disk, then closes it.
+    """
     aspect_ratio = slice_thickness / pix_spacing
     plt.imshow(processing.masks[patient_idx], cmap="gray", aspect=1 / aspect_ratio)
     plt.contourf(processing.masks[patient_idx], alpha=0.25)
@@ -271,6 +376,7 @@ def single_plot(
 
 if __name__ == "__main__":
     patient_idx = 9
+    # 30 Epochs training
     output = [
         5.0588e-01,
         4.9987e-01,
