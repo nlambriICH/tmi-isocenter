@@ -43,9 +43,9 @@ def extract_data(output: torch.Tensor):
     for i in range(12):
         for j in range(3):
             isocenters_hat[i, j] = output[3 * i + j].item()
-        for j in range(2):
-            jaws_X_pix_hat[i, j] = output[36 + 2 * i + j].item()
-            jaws_Y_pix_hat[i, j] = output[60 + 2 * i + j].item()
+            if j < 2:
+                jaws_X_pix_hat[i, j] = output[36 + 2 * i + j].item()
+                jaws_Y_pix_hat[i, j] = output[60 + 2 * i + j].item()
     return isocenters_hat, jaws_X_pix_hat, jaws_Y_pix_hat
 
 

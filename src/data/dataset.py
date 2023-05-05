@@ -3,7 +3,7 @@ from typing import Literal
 import traceback
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import StratifiedShuffleSplit
+from sklearn.model_selection import train_test_split
 
 
 class Dataset:
@@ -51,7 +51,7 @@ class Dataset:
             tuple(np.ndarray, np.ndarray): train, val, and test index splits
 
         Notes:
-            The dataset split is not stratified by the class labels (collimator angle)
+            The dataset split is stratified by the class labels (collimator angle)
         """
 
         if test_set == "date":
@@ -77,10 +77,8 @@ class Dataset:
             dtype=np.uint8
         )  # remove test_idx from dataframe
 
-        train_idx, val_idx = next(
-            StratifiedShuffleSplit(n_splits=1, test_size=0.1).split(
-                np.zeros_like(train_idx), self.angle_class[train_idx - 1]
-            )
+        train_idx, val_idx = train_test_split(
+            train_idx, train_size=0.9, stratify=self.angle_class[train_idx]
         )
 
         imb_ratio_train = np.sum(self.angle_class[train_idx] == 0) / np.sum(
