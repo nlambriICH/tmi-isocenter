@@ -23,6 +23,7 @@ if __name__ == "__main__":
         masks_test,
         y_reg_test,
         y_cls_test,
+        test_idx,
     ) = tuple(
         map(
             torch.Tensor,
@@ -36,6 +37,7 @@ if __name__ == "__main__":
                 masks_aug[test_index],
                 y_reg[test_index],
                 y_cls[test_index],
+                test_index,
             ),
         )
     )
@@ -51,7 +53,7 @@ if __name__ == "__main__":
         num_workers=16,
     )
     test_loader = DataLoader(
-        TensorDataset(masks_test, y_reg_test, y_cls_test),
+        TensorDataset(masks_test, y_reg_test, y_cls_test, test_idx),
         num_workers=16,
     )
 
