@@ -6,6 +6,7 @@ from torchmetrics.classification import BinaryAccuracy
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.optim import Adam
 from src.models.cnn import CNN
+from src.utils.visualization_cnn import plot_img
 
 
 class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
@@ -96,7 +97,7 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
             batch (list[torch.Tensor]): input batch
             batch_idx (int): batch index
         """
-        x, y_reg, y_cls, patient_id = batch
+        x, y_reg, y_cls, test_idx = batch
         # need additional (batch) dimension because Flatten layer has start_dim=1
         x = x.unsqueeze_(0)  # shape=(1, 1, 512, 512)
         y_reg = y_reg.view(1, -1)  # shape=(1, N_out)
@@ -106,7 +107,11 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
         self.accuracy(torch.sigmoid(y_cls_hat), y_cls)
         metrics = {"test_mse_loss": test_mse_loss, "test_accuracy": self.accuracy}
         self.log_dict(metrics)
-        # TODO: add plot predictions
+        plot_img(
+            int(test_idx.item()),
+            y_reg_hat[0],
+            self.logger.log_dir,  # pyright: ignore[reportGeneralTypeIssues,reportOptionalMemberAccess]
+        )
 
     def forward(  # pylint: disable=arguments-differ
         self, x: torch.Tensor
