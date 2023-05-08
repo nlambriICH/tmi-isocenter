@@ -17,7 +17,7 @@ class CNN(nn.Module):
         )
         self.regression_head = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(20 * 249 * 249, 84),
+            nn.Linear(20 * 249 * 249, 44),  # Qui mi aspetto 45 ma qualcosa di diverso
         )
         self.classification_head = nn.Sequential(
             nn.Flatten(),
