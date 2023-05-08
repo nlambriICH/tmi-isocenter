@@ -10,7 +10,7 @@ from src.modules.lightning_cnn import LitCNN
 
 if __name__ == "__main__":
     dataset = Dataset()
-    train_index, val_idx, test_index = dataset.train_val_test_split(test_set="date")
+    train_index, val_idx, test_index = dataset.train_val_test_split(test_set="balanced")
     masks_aug, y_reg, y_cls = dataset.get_data_Xy()
 
     (
@@ -44,17 +44,17 @@ if __name__ == "__main__":
 
     train_loader = DataLoader(
         TensorDataset(masks_train, y_reg_train, y_cls_train),
-        num_workers=16,
+        num_workers=1,
         batch_size=10,
         shuffle=True,
     )
     val_loader = DataLoader(
         TensorDataset(masks_val, y_reg_val, y_cls_val),
-        num_workers=16,
+        num_workers=1,
     )
     test_loader = DataLoader(
         TensorDataset(masks_test, y_reg_test, y_cls_test, test_idx),
-        num_workers=16,
+        num_workers=1,
     )
 
     lightning_cnn = LitCNN()
@@ -66,7 +66,7 @@ if __name__ == "__main__":
             ),  # print the weights summary of the model when trainer.fit() is called
             LearningRateMonitor(logging_interval="epoch"),
         ],
-        max_epochs=1,
+        max_epochs=50,
         log_every_n_steps=1,
     )
     trainer.fit(

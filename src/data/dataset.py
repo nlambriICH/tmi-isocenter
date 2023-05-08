@@ -36,7 +36,7 @@ class Dataset:
         )
 
     def train_val_test_split(
-        self, test_set: Literal["date", "oldest", "latest"]
+        self, test_set: Literal["date", "oldest", "latest", "balanced"]
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Get the train/val/test indexes :
             - 10 patients for test set
@@ -66,6 +66,14 @@ class Dataset:
             test_idx = self.df_patient_info.iloc[-10:].index.to_numpy(
                 dtype=np.uint8
             )  # get index of the last 10th rows
+        elif test_set == "balanced":
+            test_idx = train_test_split(
+                self.df_patient_info.index,
+                train_size=0.91,
+                stratify=self.angle_class[self.df_patient_info.index],
+            )[1].to_numpy(
+                dtype=np.uint8
+            )  # get index as a balance test_set
         else:
             raise ValueError(
                 f'test_set must be "data" or "oldest" or "latest" but was {test_set}'
@@ -100,14 +108,50 @@ class Dataset:
         isocenters_pix_flat = self.isocenters_pix.reshape(self.num_patients, -1)
         jaws_X_pix_flat = self.jaws_X_pix.reshape(self.num_patients, -1)
         jaws_Y_pix_flat = self.jaws_Y_pix.reshape(self.num_patients, -1)
+        y_reg = self.unique_output(
+            isocenters_pix_flat, jaws_X_pix_flat, jaws_Y_pix_flat
+        )
 
         return (
             self.masks2d,
-            np.concatenate(
-                (isocenters_pix_flat, jaws_X_pix_flat, jaws_Y_pix_flat), axis=1
-            ),
+            y_reg,
             self.angle_class,
         )
+
+    def unique_output(self, isocenters_pix_flat, jaws_X_pix_flat, jaws_Y_pix_flat):
+        """
+        y_reg= MI CREO IL VETTORE DI DATI CORRETTO, QUELLI CHE MI SERVONO
+         ISO   [X8, Y8, Xnull, Ynull,+Xbraccia,+Ybraccia,Xbraccia, Z1, Z2, Z3, Z4....Z6, ...   TOT ISO=13
+        # CampiX [QUASI TUTTI] Nei tre isocentri sul tronco la coordinata x è uguale a -y nell'Iso successivo. TOT=21
+        # CampiY ... XGambe,YGambe, XNull, X8, X1testa, Y1testa, X2testa, Y2testa, Xbraccia, Ybraccia, ... TOT=10
+        """
+        # Ciclo for inutile, quindi va cambiato
+        y_reg = np.zeros(shape=(self.num_patients, 1, 44), dtype=float)
+        for i, (iso, jaw_X_pix, jaw_Y_pix) in enumerate(
+            zip(isocenters_pix_flat, jaws_X_pix_flat, jaws_Y_pix_flat)
+        ):
+            unique_iso_idx = [
+                0,
+                1,
+                12,
+                13,
+                30,
+                31,
+                33,
+            ]
+            y_iso_new2 = np.zeros(shape=(6), dtype=float)
+            y_iso_new1 = iso[unique_iso_idx]
+            for z in range(6):
+                y_iso_new2[z] = iso[z * 3 * 2 + 2]
+            usless_idx = [11, 15, 19]
+            y_jaw_X = np.delete(jaw_X_pix, usless_idx)
+            unique_Y_idx = [0, 2, 4, 8, 16, 17, 18, 19, 20, 22]
+            y_jaw_Y = jaw_Y_pix[unique_Y_idx]
+            y_reg_local = np.concatenate(
+                (y_iso_new1, y_iso_new2, y_jaw_X, y_jaw_Y), axis=0
+            )
+            y_reg[i] = y_reg_local
+        return y_reg
 
     @property
     def get_patient_info(self) -> pd.DataFrame:
