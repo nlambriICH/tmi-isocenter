@@ -18,7 +18,58 @@ coll_angles = np.load(r"data\raw\angles.npy")
 df_patient_info = pd.read_csv(r"data\patient_info.csv")
 
 
-def extract_data(output: torch.Tensor):
+def build_output(y_hat: torch.Tensor):
+    output = np.zeros(shape=(84))
+    index_X = [0, 3, 6, 9, 18, 21, 24, 27]
+    index_Y = [1, 4, 7, 10, 19, 22, 25, 28]
+    output[index_X] = y_hat[0].item()  # Coordinata X ripetuta 8 volte
+    output[index_Y] = y_hat[1].item()  # Coordinata Y ripetuta 8 volte
+    output[[12, 15]] = y_hat[2].item()  # Coordinate X 3° isocentro a volte opzionale
+    output[[13, 16]] = y_hat[3].item()  # Coordinate Y 3° isocentro a volte opzionale
+    output[30] = y_hat[4].item()  # Coordinata X1 braccio
+    output[[31, 34]] = y_hat[5].item()  # Coordinata Y braccio ripetuta 2 volte
+    output[33] = y_hat[6].item()  # Coordinata X2 braccio
+    for z in range(6):  # Coordinate Z 6 coppie diverse
+        output[z * 3 * 2 + 2] = y_hat[z + 7].item()
+        output[z * 3 * 2 + 5] = y_hat[z + 7].item()
+    # Begin jaw_X
+    for i in range(11):
+        output[36 + i] = y_hat[
+            13 + i
+        ].item()  # Recupero i primi 11 campi fino al primo ripetuto
+    output[47] = -output[44]
+    for i in range(3):
+        output[48 + i] = y_hat[
+            24 + i
+        ].item()  # Aggiungo a gruppi di tre evitando i ripetuti
+        output[52 + i] = y_hat[27 + i].item()
+        output[56 + i] = y_hat[30 + i].item()
+
+    output[51] = -output[48]
+    output[55] = -output[52]
+    output[59] = y_hat[33].item()
+    # end jaw_X
+    # Begin jaw_Y
+    for i in range(4):
+        if i < 2:
+            output[60 + 2 * i] = y_hat[i + 34].item()  # Campi uguali a segni alterni
+            output[61 + 2 * i] = -y_hat[i + 34].item()
+            output[64 + 2 * i] = y_hat[
+                36
+            ].item()  # Campo terzo isocentro tutto uguale a segno alterno
+            output[65 + 2 * i] = -y_hat[36].item()
+            output[80 + 2 * i] = y_hat[42 + i].item()  # Campi braccia a segni alterni
+            output[81 + 2 * i] = -y_hat[42 + i].item()
+        if i < 4:
+            output[68 + 2 * i] = y_hat[37].item()  # 8 campi uguali a segni alterni
+            output[69 + 2 * i] = -y_hat[37].item()
+            output[76 + i] = y_hat[38 + i].item()  # Campi testa tutti diversi
+    return torch.Tensor(output)
+
+
+def extract_data(
+    output: torch.Tensor,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Reorganize the data from a given output torch.Tensor, returns them in three separate 2D arrays.
 
@@ -46,7 +97,7 @@ def extract_data(output: torch.Tensor):
             if j < 2:
                 jaws_X_pix_hat[i, j] = output[36 + 2 * i + j].item()
                 jaws_Y_pix_hat[i, j] = output[60 + 2 * i + j].item()
-    return isocenters_hat, jaws_X_pix_hat, jaws_Y_pix_hat
+    return (isocenters_hat, jaws_X_pix_hat, jaws_Y_pix_hat)
 
 
 def add_rectangle_patch(
@@ -189,7 +240,8 @@ def plot_img(patient_idx: int, output: torch.Tensor, path: str) -> None:
     """
     pix_spacing = df_patient_info.iloc[patient_idx, -1]
     slice_thickness = df_patient_info.iloc[patient_idx, -2]
-
+    if output.size()[0] < 84:
+        output = build_output(output)
     isocenters_hat, jaws_X_pix_hat, jaws_Y_pix_hat = extract_data(output)
     processing = Processing(
         masks,
@@ -375,7 +427,7 @@ def separate_plot(
 
 
 if __name__ == "__main__":
-    patient_idx = 9
+    patient_idx = 109
     # 30 Epochs training
     output = [
         5.0588e-01,
@@ -464,5 +516,53 @@ if __name__ == "__main__":
         -1.2458e-03,
     ]
     output = torch.Tensor(output)
+    test_1 = [
+        0.50371683,
+        0.51157981,
+        0.50371683,
+        0.51157981,
+        0.0,
+        0.0,
+        0.0,
+        0.13488376,
+        0.33023259,
+        0.5162791,
+        0.69302332,
+        0.86976749,
+        0.0,
+        -0.01666667,
+        0.21666667,
+        -0.26666667,
+        0.01666667,
+        -0.01666667,
+        0.2,
+        -0.21666667,
+        0.01666667,
+        -0.01666667,
+        0.2,
+        -0.2,
+        -0.01666667,
+        0.21666667,
+        -0.2,
+        -0.01666667,
+        0.14666667,
+        -0.2,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        -0.18604633,
+        -0.18604633,
+        -0.18604633,
+        -0.18604633,
+        -0.11906977,
+        0.12186047,
+        -0.11627907,
+        0.11813954,
+        0.0,
+        0.0,
+    ]
+    test_1 = torch.Tensor(test_1)
+    first_try = build_output(test_1)
     path = "d:/trash/tmi-isocenter/lightning_logs/test"
-    plot_img(patient_idx, output, path)
+    plot_img(patient_idx, first_try, path)
