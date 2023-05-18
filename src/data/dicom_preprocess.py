@@ -351,6 +351,21 @@ def read_dicoms():
         jaws_Y_pix.append(jaw_Y_pixel)
         angles.append(coll_angles)
 
+        first_slice = rtstruct.series_data[0]
+        assert np.all(
+            [
+                first_slice.SliceThickness == dcm.SliceThickness
+                for dcm in rtstruct.series_data
+            ]
+        ), "Not all slices have the same thickness"
+
+        assert np.all(
+            [
+                first_slice.PixelSpacing == dcm.PixelSpacing
+                for dcm in rtstruct.series_data
+            ]
+        ), "Not all slices have the same pixel spacing"
+
         patient_info.append(
             (
                 patient_id,
@@ -365,6 +380,8 @@ def read_dicoms():
                 mask_3d.shape[0],
                 mask_3d.shape[1],
                 mask_3d.shape[2],
+                rtstruct.series_data[0].SliceThickness,
+                rtstruct.series_data[0].PixelSpacing[0],
             )
         )
 
@@ -397,6 +414,8 @@ if __name__ == "__main__":
             "OrigMaskShape_y",
             "OrigMaskShape_x",
             "OrigMaskShape_z",
+            "SliceThickness",
+            "PixelSpacing",
         ),
     ).to_csv(r"data\patient_info.csv")
     np.savez(
