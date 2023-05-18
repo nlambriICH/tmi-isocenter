@@ -20,50 +20,54 @@ df_patient_info = pd.read_csv(r"data\patient_info.csv")
 
 def build_output(y_hat: torch.Tensor):
     output = np.zeros(shape=(84))
-    index_X = [0, 3, 6, 9, 18, 21, 24, 27]
-    index_Y = [1, 4, 7, 10, 19, 22, 25, 28]
-    output[index_X] = y_hat[0].item()  # Coordinata X ripetuta 8 volte
-    output[index_Y] = y_hat[1].item()  # Coordinata Y ripetuta 8 volte
-    output[[12, 15]] = y_hat[2].item()  # Coordinate X 3° isocentro a volte opzionale
-    output[[13, 16]] = y_hat[3].item()  # Coordinate Y 3° isocentro a volte opzionale
-    output[30] = y_hat[4].item()  # Coordinata X1 braccio
-    output[[31, 34]] = y_hat[5].item()  # Coordinata Y braccio ripetuta 2 volte
-    output[33] = y_hat[6].item()  # Coordinata X2 braccio
+    # iso
+    index_X = [0, 3, 6, 9, 12, 15, 18, 21, 24, 27]
+    index_Y = [1, 4, 7, 10, 13, 16, 19, 22, 25, 28]
+    output[index_X] = y_hat[
+        0
+    ].item()  # Coordinata X ripetuta 8 volte + 2 volte iso null
+    output[index_Y] = y_hat[
+        1
+    ].item()  # Coordinata Y ripetuta 8 volte + 2 volte iso null
+    output[30] = y_hat[2].item()  # Coordinata X1 braccio
+    output[[31, 34]] = y_hat[3].item()  # Coordinata Y braccio ripetuta 2 volte
+    output[33] = y_hat[4].item()  # Coordinata X2 braccio
     for z in range(6):  # Coordinate Z 6 coppie diverse
-        output[z * 3 * 2 + 2] = y_hat[z + 7].item()
-        output[z * 3 * 2 + 5] = y_hat[z + 7].item()
+        output[z * 3 * 2 + 2] = y_hat[z + 5].item()
+        output[z * 3 * 2 + 5] = y_hat[z + 5].item()
     # Begin jaw_X
     for i in range(11):
         output[36 + i] = y_hat[
-            13 + i
+            11 + i
         ].item()  # Recupero i primi 11 campi fino al primo ripetuto
     output[47] = -output[44]
     for i in range(3):
         output[48 + i] = y_hat[
-            24 + i
+            22 + i
         ].item()  # Aggiungo a gruppi di tre evitando i ripetuti
-        output[52 + i] = y_hat[27 + i].item()
-        output[56 + i] = y_hat[30 + i].item()
+        output[52 + i] = y_hat[25 + i].item()
+        output[56 + i] = y_hat[28 + i].item()
 
     output[51] = -output[48]
     output[55] = -output[52]
-    output[59] = y_hat[33].item()
+    output[59] = y_hat[31].item()
     # end jaw_X
     # Begin jaw_Y
     for i in range(4):
         if i < 2:
-            output[60 + 2 * i] = y_hat[i + 34].item()  # Campi uguali a segni alterni
-            output[61 + 2 * i] = -y_hat[i + 34].item()
-            output[64 + 2 * i] = y_hat[
-                36
-            ].item()  # Campo terzo isocentro tutto uguale a segno alterno
-            output[65 + 2 * i] = -y_hat[36].item()
-            output[80 + 2 * i] = y_hat[42 + i].item()  # Campi braccia a segni alterni
-            output[81 + 2 * i] = -y_hat[42 + i].item()
-        if i < 4:
-            output[68 + 2 * i] = y_hat[37].item()  # 8 campi uguali a segni alterni
-            output[69 + 2 * i] = -y_hat[37].item()
-            output[76 + i] = y_hat[38 + i].item()  # Campi testa tutti diversi
+            output[60 + 2 * i] = y_hat[i + 32].item()  # Campi uguali a segni alterni
+            output[61 + 2 * i] = -y_hat[i + 32].item()
+            output[64 + 2 * i] = y_hat[34].item()  # 4  campi uguali a segni alterni
+            output[65 + 2 * i] = -y_hat[34].item()  # 4  campi uguali a segni alterni
+            output[68 + 2 * i] = y_hat[35].item()  # 4 Terzo isocentro
+            output[69 + 2 * i] = -y_hat[35].item()
+            output[72 + 2 * i] = y_hat[
+                34
+            ].item()  # altri 4  campi uguali a segni alterni come quelli di prima
+            output[73 + 2 * i] = -y_hat[34].item()
+            output[80 + 2 * i] = y_hat[40 + i].item()  # Campi braccia a segni alterni
+            output[81 + 2 * i] = -y_hat[40 + i].item()
+        output[76 + i] = y_hat[36 + i].item()  # Campi testa tutti diversi
     return torch.Tensor(output)
 
 
@@ -517,50 +521,48 @@ if __name__ == "__main__":
     ]
     output = torch.Tensor(output)
     test_1 = [
-        0.50371683,
-        0.51157981,
-        0.50371683,
-        0.51157981,
-        0.0,
-        0.0,
-        0.0,
-        0.13488376,
-        0.33023259,
-        0.5162791,
-        0.69302332,
-        0.86976749,
-        0.0,
-        -0.01666667,
-        0.21666667,
-        -0.26666667,
-        0.01666667,
-        -0.01666667,
-        0.2,
-        -0.21666667,
-        0.01666667,
-        -0.01666667,
-        0.2,
-        -0.2,
-        -0.01666667,
-        0.21666667,
-        -0.2,
-        -0.01666667,
-        0.14666667,
-        -0.2,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        -0.18604633,
-        -0.18604633,
-        -0.18604633,
-        -0.18604633,
-        -0.11906977,
-        0.12186047,
-        -0.11627907,
-        0.11813954,
-        0.0,
-        0.0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
     ]
     test_1 = torch.Tensor(test_1)
     first_try = build_output(test_1)
