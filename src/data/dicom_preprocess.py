@@ -1,9 +1,11 @@
+import os
+import glob
+import warnings
+import numpy as np
+import pandas as pd
 import pydicom
 from pydicom import Dataset
-import numpy as np
-import glob
 from rt_utils import RTStructBuilder, RTStruct
-import os
 from rt_utils.image_helper import (
     get_patient_to_pixel_transformation_matrix,
     apply_transformation_to_3d_points,
@@ -16,7 +18,6 @@ from src.config.constants import (
     DICOM_PATH,
 )
 from src.utils.field_geometry_transf import transform_field_geometry
-import pandas as pd
 
 
 def filter_ptv_name(name: str) -> bool:
@@ -246,7 +247,33 @@ def get_dicom_field_geometry(
     return isocenters, jaw_X, jaw_Y, coll_angle
 
 
-def read_dicoms():
+def get_ptv_image_3d(series_data: list[Dataset], mask_3d: np.ndarray) -> np.ndarray:
+    """
+    Generate a 3D image from a list of 2D image datasets and apply a mask.
+
+    Args:
+        series_data (list[Dataset]): A list of 2D image datasets.
+        mask_3d (np.ndarray): A 3D mask array to be applied to the generated image.
+
+    Returns:
+        np.ndarray: A 3D image array obtained by stacking the 2D images from the series_data list along the third dimension,
+                    multiplied element-wise by the provided mask_3d.
+    """
+    # Create 3D array
+    img_shape = list(series_data[0].pixel_array.shape)
+    img_shape.append(len(series_data))
+    img_3d = np.zeros(img_shape)
+
+    for i, s in enumerate(series_data):
+        img_2d = s.pixel_array
+        img_3d[:, :, i] = img_2d
+
+    assert img_3d.shape == mask_3d.shape
+
+    return img_3d * mask_3d
+
+
+def read_dicoms() -> tuple[list, list, list, list, list, list, list]:
     """
     Read DICOM files and extract relevant raw information for model training.
 
@@ -256,6 +283,7 @@ def read_dicoms():
                             patient ID, PTV name, junction names, RT plan label, study date, isocenter arm flag,
                             collimator angle flag, and the dimensions of the corresponding mask.
             - masks: List of 2D arrays representing the PTV mask for each patient in the input directory.
+            - ptv_imgs: List of 2D arrays representing the PTV density for each patient in the input directory.
             - isocenters_pix: List of 3D arrays representing the isocenter pixel coordinates for each patient.
             - jaws_X_pix: List of 2D arrays representing the X aperture pixel coordinates for each patient.
             - jaws_Y_pix: List of 2D arrays representing the Y aperture pixel coordinates for each patient.
@@ -266,12 +294,13 @@ def read_dicoms():
                         coordinates being positive or the sign of aperture pixel coordinates not being conserved
                         between DICOM and patient coordinate systems.
     """
+    patient_info = []
     masks = []
+    ptv_imgs = []
     isocenters_pix = []
     jaws_X_pix = []
     jaws_Y_pix = []
     angles = []
-    patient_info = []
 
     axis_direction = np.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
 
@@ -345,7 +374,17 @@ def read_dicoms():
         # can improve the performance of the model
         mask_2d = mask_3d.any(axis=0)
 
+        # Saving the HU density of PTV in coronal plane (i.e., (x, z) plane)
+        # The 2D img is the average of non-zero pixel_array values contained in the PTV along the y axis
+        # Taking the mean of empty slices (all elements == 0) gives np.nan and warnings from NumPy
+        ptv_img_3d = get_ptv_image_3d(rtstruct.series_data, mask_3d)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=RuntimeWarning)
+            ptv_img_2d = ptv_img_3d.mean(axis=0, where=ptv_img_3d != 0)
+        ptv_img_2d = np.nan_to_num(ptv_img_2d)
+
         masks.append(mask_2d)
+        ptv_imgs.append(ptv_img_2d)
         isocenters_pix.append(iso_pixel)
         jaws_X_pix.append(jaw_X_pixel)
         jaws_Y_pix.append(jaw_Y_pixel)
@@ -385,13 +424,14 @@ def read_dicoms():
             )
         )
 
-    return patient_info, masks, isocenters_pix, jaws_X_pix, jaws_Y_pix, angles
+    return patient_info, masks, ptv_imgs, isocenters_pix, jaws_X_pix, jaws_Y_pix, angles
 
 
 if __name__ == "__main__":
     (
         patient_info,
         masks,
+        ptv_imgs,
         isocenters_pix,
         jaws_X_pix,
         jaws_Y_pix,
@@ -421,6 +461,9 @@ if __name__ == "__main__":
     np.savez(
         r"data\raw\masks2D.npz", *masks
     )  # unpack the list to pass the mask2D arrays as positional arguments
+    np.savez(
+        r"data\raw\ptv_imgs2D.npz", *ptv_imgs
+    )  # unpack the list to pass the ptv_imgs2D arrays as positional arguments
     np.save(r"data\raw\isocenters_pix.npy", np.array(isocenters_pix))
     np.save(r"data\raw\jaws_X_pix.npy", np.array(jaws_X_pix))
     np.save(r"data\raw\jaws_Y_pix.npy", np.array(jaws_Y_pix))
