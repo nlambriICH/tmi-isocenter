@@ -24,6 +24,7 @@ if __name__ == "__main__":
         y_reg_test,
         y_cls_test,
         test_idx,
+        train_index,
     ) = tuple(
         map(
             torch.Tensor,
@@ -38,12 +39,13 @@ if __name__ == "__main__":
                 y_reg[test_index],
                 y_cls[test_index],
                 test_index,
+                train_index,
             ),
         )
     )
 
     train_loader = DataLoader(
-        TensorDataset(masks_train, y_reg_train, y_cls_train),
+        TensorDataset(masks_train, y_reg_train, y_cls_train, train_index),
         num_workers=1,
         batch_size=10,
         shuffle=True,
@@ -60,13 +62,13 @@ if __name__ == "__main__":
     lightning_cnn = LitCNN()
     trainer = pl.Trainer(
         callbacks=[  # pyright: ignore[reportGeneralTypeIssues]
-            EarlyStopping(monitor="val_mse_loss", mode="min", patience=20),
+            EarlyStopping(monitor="val_mse_loss", mode="min", patience=10),
             ModelSummary(
                 max_depth=-1
             ),  # print the weights summary of the model when trainer.fit() is called
             LearningRateMonitor(logging_interval="epoch"),
         ],
-        max_epochs=50,
+        max_epochs=40,
         log_every_n_steps=1,
     )
     trainer.fit(
