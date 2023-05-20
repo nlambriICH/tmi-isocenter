@@ -470,7 +470,7 @@ class Processing:
 
 
 if __name__ == "__main__":
-    with np.load(r"data\raw\masks2D.npz") as npz_masks2d:
+    with np.load(r"data\raw\ptv_imgs2D.npz") as npz_masks2d:
         masks = list(npz_masks2d.values())
     isocenters_pix = np.load(r"data\raw\isocenters_pix.npy")
     jaws_X_pix = np.load(r"data\raw\jaws_X_pix.npy")
