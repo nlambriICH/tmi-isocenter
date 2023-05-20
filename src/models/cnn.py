@@ -9,19 +9,20 @@ class CNN(nn.Module):
     def __init__(self):
         super().__init__()
         self.simple_cnn = nn.Sequential(
-            nn.Conv2d(1, 20, 8),
+            nn.Conv2d(1, 15, 8),
             nn.ReLU(),
-            nn.Conv2d(20, 20, 8),
+            nn.Conv2d(15, 15, 8),
             nn.ReLU(),
             nn.MaxPool2d(2),
         )
+
         self.regression_head = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(20 * 249 * 249, 44),  # Qui mi aspetto 45 ma qualcosa di diverso
+            nn.Linear(15 * 249 * 249, 42),
         )
         self.classification_head = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(20 * 249 * 249, 1),
+            nn.Linear(15 * 249 * 249, 1),
         )
 
     def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
