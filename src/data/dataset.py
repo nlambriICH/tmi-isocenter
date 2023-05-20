@@ -13,12 +13,12 @@ class Dataset:
         with np.load(r"data\interim\masks2D.npz") as npz_masks2d:  # shape=(N, 512, z)
             try:
                 self.masks2d = np.array(list(npz_masks2d.values()))
+                self.masks2d = self.normalize_ptv()
             except ValueError:
                 traceback.print_exc()
                 print(
                     "Could not create NumPy array of masks. Please ensure they are square matrices."
                 )
-
         self.num_patients = self.masks2d.shape[0]
 
         self.isocenters_pix = np.load(
@@ -34,6 +34,51 @@ class Dataset:
         self.df_patient_info = pd.read_csv(r"data\patient_info.csv").sort_values(
             by="PlanDate"
         )
+        # Creating the class interaction between arms and angle
+        self.iso_on_arms = self.df_patient_info["IsocenterOnArms"].to_numpy()
+
+        self.arms_or_angle = np.where(
+            (self.angle_class == 0) & (self.iso_on_arms == 0),
+            0,
+            np.where(
+                (self.angle_class == 1) & (self.iso_on_arms == 0),
+                1,
+                np.where((self.angle_class == 0) & (self.iso_on_arms == 1), 2, 3),
+            ),
+        )
+
+    def normalize_ptv(self, background=-1) -> np.ndarray:
+        """Normalize the 2D masks of the PTV (Planning Target Volume).
+
+        Parameters:
+            self (object): The instance of the class containing the masks.
+            background (int): Background value used for normalization. Default is -1.
+
+        Returns:
+            np.ndarray: A numpy array containing the normalized masks.
+
+        Description:
+            This function normalizes the 2D masks of the PTV by applying a min-max normalization
+            to each mask. The normalization is performed independently on each mask, ensuring
+            that the minimum value of each mask becomes 0 and the maximum value becomes 1.
+            If the `background` parameter is provided, the normalization is performed by considering
+            only the non-zero values within each mask, with the background value specified.
+            Otherwise, if `background` is set to -1, the entire mask range is considered for normalization.
+            The resulting normalized masks are stored in a new numpy array `norm_ptv` which is returned.
+        """
+        norm_ptv = np.zeros_like(self.masks2d)
+        for i, mask in enumerate(self.masks2d):
+            non_zero_values = mask[mask != 0]
+            min_value = np.min(non_zero_values) if background == -1 else np.min(mask)
+            max_value = np.max(non_zero_values) if background == -1 else np.max(mask)
+            difference = max_value - min_value
+            normalized = (
+                np.where(mask != 0, (mask - min_value) / difference, background)
+                if background == -1
+                else (mask - min_value) / difference
+            )
+            norm_ptv[i] = normalized
+        return norm_ptv
 
     def train_val_test_split(
         self, test_set: Literal["date", "oldest", "latest", "balanced"]
@@ -71,6 +116,7 @@ class Dataset:
                 self.df_patient_info.index,
                 train_size=0.91,
                 stratify=self.angle_class[self.df_patient_info.index],
+                # self.arms_or_angle[self.df_patient_info.index]
             )[1].to_numpy(
                 dtype=np.uint8
             )  # get index as a balance test_set
@@ -86,8 +132,15 @@ class Dataset:
         )  # remove test_idx from dataframe
 
         train_idx, val_idx = train_test_split(
-            train_idx, train_size=0.9, stratify=self.angle_class[train_idx]
+            train_idx,
+            train_size=0.9,
+            stratify=self.angle_class[train_idx],
+            # , self.arms_or_angle[train_idx],
         )
+
+        # imb_ratios_train = [np.sum(self.arms_or_angle[train_idx] == i) / np.sum(self.arms_or_angle[train_idx] != i) for i in range(4)]
+        # imb_ratios_val = [np.sum(self.arms_or_angle[val_idx] == i) / np.sum(self.arms_or_angle[val_idx] != i) for i in range(4)]
+        # imb_ratios_test = [np.sum(self.angle_class[test_idx] == i) / np.sum(self.arms_or_angle[test_idx] != i) for i in range(4)]
 
         imb_ratio_train = np.sum(self.angle_class[train_idx] == 0) / np.sum(
             self.angle_class[train_idx] == 1
@@ -118,34 +171,66 @@ class Dataset:
             self.angle_class,
         )
 
-    def unique_output(self, isocenters_pix_flat, jaws_X_pix_flat, jaws_Y_pix_flat):
+    def unique_output(
+        self, isocenters_pix_flat, jaws_X_pix_flat, jaws_Y_pix_flat
+    ) -> np.ndarray:
         """
-        y_reg= MI CREO IL VETTORE DI DATI CORRETTO, QUELLI CHE MI SERVONO
-         ISO   [X8, Y8, Xnull, Ynull,+Xbraccia,+Ybraccia,Xbraccia, Z1, Z2, Z3, Z4....Z6, ...   TOT ISO=13
-        # CampiX [QUASI TUTTI] Nei tre isocentri sul tronco la coordinata x è uguale a -y nell'Iso successivo. TOT=21
-        # CampiY ... XGambe,YGambe, XNull, X8, X1testa, Y1testa, X2testa, Y2testa, Xbraccia, Ybraccia, ... TOT=10
+        Create a new data configuration for the input of the models.
+
+        Args:
+            isocenters_pix_flat (np.ndarray): Flat array containing the isocenter values.
+            jaws_X_pix_flat (np.ndarray): Flat array containing the X_jaws values.
+            jaws_Y_pix_flat (np.ndarray): Flat array containing the Y_jaws values.
+
+        Returns:
+            np.ndarray: Array with the unique values from the input data.
+                The resulting array has a shape of (self.num_patients, 1, 42).
+
+        Notes:
+            - The resulting array contains 11 values for the isocenters,
+            21 values for the X_jaws, and 10 values for the Y_jaws.
+            - Specific indices are used to select the unique values from the input arrays.
+            Details about the selected indices can be found in the function implementation.
         """
-        # Ciclo for inutile, quindi va cambiato
-        y_reg = np.zeros(shape=(self.num_patients, 1, 44), dtype=float)
+        y_reg = np.zeros(shape=(self.num_patients, 1, 42), dtype=float)
         for i, (iso, jaw_X_pix, jaw_Y_pix) in enumerate(
             zip(isocenters_pix_flat, jaws_X_pix_flat, jaws_Y_pix_flat)
         ):
+            # Isocenters
             unique_iso_idx = [
                 0,
                 1,
-                12,
-                13,
                 30,
                 31,
                 33,
-            ]
+            ]  # indexes: 0,1= one coord. for x,y axes; 30,31 = two different X-coord. on the arms; 33 = Y-coord. on the arms.
             y_iso_new2 = np.zeros(shape=(6), dtype=float)
             y_iso_new1 = iso[unique_iso_idx]
             for z in range(6):
-                y_iso_new2[z] = iso[z * 3 * 2 + 2]
-            usless_idx = [11, 15, 19]
+                y_iso_new2[z] = iso[
+                    z * 3 * 2 + 2
+                ]  # Z-coord one for every couple of iso.
+            # X_Jaws
+            usless_idx = [
+                11,
+                15,
+                19,
+            ]  # with X_Jaw I take all the values except the for thorx, chest and head where I use the simmetry (so 1 param for 2 fields) to hug the relative iso.
             y_jaw_X = np.delete(jaw_X_pix, usless_idx)
-            unique_Y_idx = [0, 2, 4, 8, 16, 17, 18, 19, 20, 22]
+            # Y_Jaws
+            unique_Y_idx = [
+                0,
+                2,
+                4,
+                8,
+                16,
+                17,
+                18,
+                19,
+                20,
+                22,
+            ]  # Here we exploit the body's symmetry.
+            # We keep [0,2] for the legs,  4 = one values fields (pelvi+chest), 8= third iso, [16,17,18,19] for the head, [20,22]= for the arms.
             y_jaw_Y = jaw_Y_pix[unique_Y_idx]
             y_reg_local = np.concatenate(
                 (y_iso_new1, y_iso_new2, y_jaw_X, y_jaw_Y), axis=0
