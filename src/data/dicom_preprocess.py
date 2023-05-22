@@ -10,6 +10,7 @@ from rt_utils.image_helper import (
     get_patient_to_pixel_transformation_matrix,
     apply_transformation_to_3d_points,
     get_slice_directions,
+    get_spacing_between_slices,
 )
 from src.config.constants import (
     PTV_EXCLUDE_SUBSTRINGS,
@@ -393,17 +394,14 @@ def read_dicoms() -> tuple[list, list, list, list, list, list, list]:
         first_slice = rtstruct.series_data[0]
         assert np.all(
             [
-                first_slice.SliceThickness == dcm.SliceThickness
-                for dcm in rtstruct.series_data
-            ]
-        ), "Not all slices have the same thickness"
-
-        assert np.all(
-            [
                 first_slice.PixelSpacing == dcm.PixelSpacing
                 for dcm in rtstruct.series_data
             ]
         ), "Not all slices have the same pixel spacing"
+
+        # SliceThickness tag represents the nominal slice thickness in acquisition
+        # rt_utils computes the correct slice_spacing using the number of slices and patient orientation
+        slice_spacing = get_spacing_between_slices(rtstruct.series_data)
 
         patient_info.append(
             (
@@ -419,8 +417,8 @@ def read_dicoms() -> tuple[list, list, list, list, list, list, list]:
                 mask_3d.shape[0],
                 mask_3d.shape[1],
                 mask_3d.shape[2],
-                rtstruct.series_data[0].SliceThickness,
-                rtstruct.series_data[0].PixelSpacing[0],
+                slice_spacing,
+                first_slice.PixelSpacing[0],
             )
         )
 
