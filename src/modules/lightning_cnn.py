@@ -20,7 +20,7 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
         bcelogits_loss_weight=1.0,
         weight=5,
         Act_fun="RELU + weights on z_iso",
-        channels=15,
+        filters=30,
     ):
         """Initialize the LitCNN module
 
@@ -40,7 +40,7 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
         self.weights = torch.ones(42)
         self.weights[[5, 6, 7, 8, 9, 10]] = weight
         self.save_hyperparameters()
-        self.channels = channels
+        self.filters = filters
 
     def weighted_mse_loss(
         self,
@@ -71,7 +71,7 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
         Returns:
             torch.Tensor: loss value
         """
-        x, y_reg, y_cls, train_index = batch
+        x, y_reg, y_cls = batch
         x = x.unsqueeze_(1)  # shape=(N_batch, 1, 512, 512)
         y_reg = y_reg.view(y_reg.size(0), -1)  # shape=(N_batch, N_out)
         y_cls = y_cls.view(-1, 1)  # shape=(N_batch, 1)
@@ -90,17 +90,7 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
             "train_accuracy": self.accuracy,
         }
         self.log_dict(metrics)
-        path = os.path.join(
-            self.logger.log_dir,  # pyright: ignore[reportGeneralTypeIssues, reportOptionalMemberAccess]
-            "train_img",  # pyright: ignore[reportGeneralTypeIssues]
-        )
 
-        if (self.current_epoch + 1) % 15 == 0:
-            plot_img(
-                int(train_index[0].item()),
-                y_reg_hat[0],
-                path,
-            )
         return train_loss
 
     def validation_step(  # pylint: disable=arguments-differ
@@ -132,7 +122,14 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
             batch (list[torch.Tensor]): input batch
             batch_idx (int): batch index
         """
-        x, y_reg, y_cls, test_idx = batch
+        (
+            x,
+            y_reg,
+            y_cls,
+            test_idx,
+            x_train,
+            train_index,
+        ) = batch
         # need additional (batch) dimension because Flatten layer has start_dim=1
         x = x.unsqueeze_(0)  # shape=(1, 1, 512, 512)
         y_reg = y_reg.view(1, -1)  # shape=(1, N_out)
@@ -141,7 +138,15 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
         test_mse_loss = self.weighted_mse_loss(y_reg_hat, y_reg)
         self.accuracy(torch.sigmoid(y_cls_hat), y_cls)
         metrics = {"test_mse_loss": test_mse_loss, "test_accuracy": self.accuracy}
+        x_train = x_train.unsqueeze_(0)
+        y_train_reg_hat = self.cnn(x_train)
         self.log_dict(metrics)
+        # check overfitting
+        path = os.path.join(
+            self.logger.log_dir,  # pyright: ignore[reportGeneralTypeIssues, reportOptionalMemberAccess]
+            "train_img",  # pyright: ignore[reportGeneralTypeIssues]
+        )
+        plot_img(int(train_index.item()), y_train_reg_hat[0][0], path, single_fig=True)
         plot_img(
             int(test_idx.item()),
             y_reg_hat[0],
