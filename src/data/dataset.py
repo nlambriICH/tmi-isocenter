@@ -192,18 +192,15 @@ class Dataset:
             - Specific indices are used to select the unique values from the input arrays.
             Details about the selected indices can be found in the function implementation.
         """
-        y_reg = np.zeros(shape=(self.num_patients, 1, 42), dtype=float)
+        y_reg = np.zeros(shape=(self.num_patients, 1, 39), dtype=float)
         for i, (iso, jaw_X_pix, jaw_Y_pix) in enumerate(
             zip(isocenters_pix_flat, jaws_X_pix_flat, jaws_Y_pix_flat)
         ):
             # Isocenters
             unique_iso_idx = [
-                0,
-                1,
                 30,
-                31,
                 33,
-            ]  # indexes: 0,1= one coord. for x,y axes; 30,31 = two different X-coord. on the arms; 33 = Y-coord. on the arms.
+            ]  # indexes: 0,1= one coord. for x,y axes; 30,33 = two different X-coord. on the arms;
             y_iso_new2 = np.zeros(shape=(6), dtype=float)
             y_iso_new1 = iso[unique_iso_idx]
             for z in range(6):
