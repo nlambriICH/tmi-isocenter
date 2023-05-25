@@ -45,7 +45,11 @@ if __name__ == "__main__":
     )
 
     train_loader = DataLoader(
-        TensorDataset(masks_train, y_reg_train, y_cls_train, train_index),
+        TensorDataset(
+            masks_train,
+            y_reg_train,
+            y_cls_train,
+        ),
         num_workers=1,
         batch_size=10,
         shuffle=True,
@@ -55,7 +59,14 @@ if __name__ == "__main__":
         num_workers=1,
     )
     test_loader = DataLoader(
-        TensorDataset(masks_test, y_reg_test, y_cls_test, test_idx),
+        TensorDataset(
+            masks_test,
+            y_reg_test,
+            y_cls_test,
+            test_idx,
+            masks_train[0:10],
+            train_index[0:10],
+        ),
         num_workers=1,
     )
 
