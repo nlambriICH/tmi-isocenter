@@ -10,6 +10,8 @@ from src.data.processing import Processing
 
 with np.load(r"data\raw\ptv_imgs2D.npz") as npz_masks2d:
     masks = list(npz_masks2d.values())
+with np.load(r"data\interim\masks2D.npz") as npz_masks2d:
+    masks_int = list(npz_masks2d.values())
 isocenters_pix = np.load(r"data\raw\isocenters_pix.npy")
 jaws_X_pix = np.load(r"data\raw\jaws_X_pix.npy")
 jaws_Y_pix = np.load(r"data\raw\jaws_Y_pix.npy")
@@ -18,72 +20,68 @@ df_patient_info = pd.read_csv(r"data\patient_info.csv")
 
 pix_spacing_col_idx = df_patient_info.columns.get_loc(key="PixelSpacing")
 slice_tickness_col_idx = df_patient_info.columns.get_loc(key="SliceThickness")
-df_patient_info.iloc[21, slice_tickness_col_idx] = 3
-df_patient_info.iloc[45, slice_tickness_col_idx] = 3
-df_patient_info.iloc[21, pix_spacing_col_idx] = 1.36523438  # TO CHECK
-df_patient_info.iloc[45, pix_spacing_col_idx] = 1.36523438  # TO CHECK
 
 
-def build_output(y_hat: torch.Tensor) -> torch.Tensor:
+def build_output(y_hat: torch.Tensor, patient_idx: int) -> torch.Tensor:
     output = np.zeros(shape=(84))
 
     # Isocenter indexes
     index_X = [0, 3, 6, 9, 12, 15, 18, 21, 24, 27]
     index_Y = [1, 4, 7, 10, 13, 16, 19, 22, 25, 28]
-    output[index_X] = y_hat[
-        0
-    ].item()  # x coord repeated 8 times + 2 times for iso thorax
-    output[index_Y] = y_hat[
-        1
-    ].item()  # y coord repeated 8 times + 2 times for iso thorax
-    output[30] = y_hat[2].item()  # x coord right arm
-    output[[31, 34]] = y_hat[3].item()  # y coord for arms repeated twice
-    output[33] = y_hat[4].item()  # x coord left arm
+    output[index_X] = find_x_coord(
+        masks[patient_idx]
+    )  # x coord repeated 8 times + 2 times for iso thorax
+    output[
+        index_Y
+    ] = 100  # y coord repeated 8 times + 2 times for iso thorax, setted to 0
+    output[30] = y_hat[0].item()  # x coord right arm
+    output[[31, 34]] = 100  # y coord for arms repeated twice, also constrained to 0
+    output[33] = y_hat[1].item()  # x coord left arm
 
     for z in range(6):  # z coords
-        output[z * 3 * 2 + 2] = y_hat[z + 5].item()
-        output[z * 3 * 2 + 5] = y_hat[z + 5].item()
+        output[z * 3 * 2 + 2] = y_hat[z + 2].item()
+        output[z * 3 * 2 + 5] = y_hat[z + 2].item()
 
     # Begin jaw_X
     for i in range(11):
-        output[36 + i] = y_hat[11 + i].item()  # retrieve apertures of first 11 fields
+        output[36 + i] = y_hat[8 + i].item()  # retrieve apertures of first 11 fields
 
     for i in range(3):
         output[48 + i] = y_hat[
-            22 + i
+            19 + i
         ].item()  # add in groups of three avoiding repetitions
-        output[52 + i] = y_hat[25 + i].item()
-        output[56 + i] = y_hat[28 + i].item()
+        output[52 + i] = y_hat[22 + i].item()
+        output[56 + i] = y_hat[25 + i].item()
 
     # Symmetric apertures
     output[47] = -output[44]
     output[51] = -output[48]
     output[55] = -output[52]
 
-    output[59] = y_hat[31].item()
+    output[59] = y_hat[28].item()
 
     # Begin jaw_Y
     for i in range(4):
         if i < 2:
             # Same apertures opposite signs
-            output[60 + 2 * i] = y_hat[i + 32].item()
-            output[61 + 2 * i] = -y_hat[i + 32].item()
+            output[60 + 2 * i] = y_hat[i + 29].item()
+            output[61 + 2 * i] = -y_hat[i + 29].item()
 
             # 4 fields with equal (and opposite) apertures
-            output[64 + 2 * i] = y_hat[34].item()
-            output[65 + 2 * i] = -y_hat[34].item()
-            output[68 + 2 * i] = y_hat[35].item()  # index 35 == thorax iso
-            output[69 + 2 * i] = -y_hat[35].item()
+            output[64 + 2 * i] = y_hat[31].item()
+            output[65 + 2 * i] = -y_hat[31].item()
+            output[68 + 2 * i] = y_hat[32].item()  # index 35 == thorax iso
+            output[69 + 2 * i] = -y_hat[32].item()
 
             # 2 fields with equal (and opposite) apertures
-            output[72 + 2 * i] = y_hat[34].item()
-            output[73 + 2 * i] = -y_hat[34].item()
+            output[72 + 2 * i] = y_hat[31].item()
+            output[73 + 2 * i] = -y_hat[31].item()
 
             # Arms apertures with opposite sign
-            output[80 + 2 * i] = y_hat[40 + i].item()
-            output[81 + 2 * i] = -y_hat[40 + i].item()
+            output[80 + 2 * i] = y_hat[37 + i].item()
+            output[81 + 2 * i] = -y_hat[37 + i].item()
 
-        output[76 + i] = y_hat[36 + i].item()  # apertures for the head
+        output[76 + i] = y_hat[33 + i].item()  # apertures for the head
 
     return torch.Tensor(output)
 
@@ -265,7 +263,7 @@ def plot_img(
     - The function calls the `extract_data` function to reorganize the CNN output.
     """
     if output.shape[0] < 84:
-        output = build_output(output)
+        output = build_output(output, patient_idx)
 
     pix_spacing_col_idx = df_patient_info.columns.get_loc(key="PixelSpacing")
     slice_tickness_col_idx = df_patient_info.columns.get_loc(key="SliceThickness")
@@ -480,9 +478,42 @@ def separate_plots(
     plt.close()
 
 
+def find_x_coord(masks_int: np.ndarray) -> float:
+    """
+    Calculates the normalized x-coordinate based on non-zero values in a 2D array.
+
+    Args:
+        masks_int (ndarray): A 2D NumPy array representing the input masks.
+
+    Returns:
+        float or None: The normalized x-coordinate if non-zero values are found in the array, or None otherwise.
+
+    The function iterates over the rows of the input array and identifies the first and last row
+    that contain more than 2 non-zero values. It then calculates the midpoint between these rows
+    and normalizes it based on the total number of rows in the array.
+
+    If no non-zero values are found, the function returns float("inf").
+
+    """
+    first_non_zero_value = float("inf")
+    last_non_zero_value = float("-inf")
+
+    for i, row in enumerate(masks_int):
+        if row.sum() > 2:
+            first_non_zero_value = min(first_non_zero_value, i)
+            last_non_zero_value = max(last_non_zero_value, i)
+
+    if first_non_zero_value == float("inf"):
+        return float("inf")  # Return float('inf') if all row.sum() <= 2
+
+    x_coord = (first_non_zero_value + last_non_zero_value) / 2
+
+    return x_coord / masks_int.shape[0]  # Normalize the coordinate
+
+
 if __name__ == "__main__":
     # Output tensor of old CNN model with 30 epochs training
-    patient_idx = 9
+    patient_idx = 77
     output = torch.tensor(  # old output shape (84 numbers)
         [
             5.0588e-01,
@@ -573,7 +604,7 @@ if __name__ == "__main__":
     )
 
     test_build_output = torch.arange(1, 43)  # range [1, 42] step=1, new output shape
-    reconstructed_output = build_output(test_build_output)
+    reconstructed_output = build_output(test_build_output, patient_idx)
     assert reconstructed_output.shape[0] == 84
 
     path = "test"
