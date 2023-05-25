@@ -18,9 +18,9 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
         learning_rate=1e-5,
         mse_loss_weight=5.0,
         bcelogits_loss_weight=1.0,
-        weight=5,
+        weight=2,
         Act_fun="RELU + weights on z_iso",
-        filters=30,
+        filters=1,
     ):
         """Initialize the LitCNN module
 
@@ -30,15 +30,15 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
         """
         super().__init__()
         self.example_input_array = torch.Tensor(
-            32, 1, 512, 512
+            32, 2, 512, 512
         )  # display the intermediate input and output sizes of layers when trainer.fit() is called
         self.cnn = CNN()
         self.accuracy = BinaryAccuracy()
         self.learning_rate = learning_rate
         self.train_mse_weight = mse_loss_weight
         self.bcelogits_loss_weight = bcelogits_loss_weight
-        self.weights = torch.ones(42)
-        self.weights[[5, 6, 7, 8, 9, 10]] = weight
+        self.weights = torch.ones(39)
+        self.weights[[0, 1]] = weight
         self.save_hyperparameters()
         self.filters = filters
 
@@ -72,7 +72,7 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
             torch.Tensor: loss value
         """
         x, y_reg, y_cls = batch
-        x = x.unsqueeze_(1)  # shape=(N_batch, 1, 512, 512)
+        # x = x.unsqueeze_(1)  # shape=(N_batch, 1, 512, 512)
         y_reg = y_reg.view(y_reg.size(0), -1)  # shape=(N_batch, N_out)
         y_cls = y_cls.view(-1, 1)  # shape=(N_batch, 1)
         y_reg_hat, y_cls_hat = self.cnn(x)
@@ -104,7 +104,7 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
         """
         x, y_reg, y_cls = batch
         # need additional (batch) dimension because Flatten layer has start_dim=1
-        x = x.unsqueeze_(0)  # shape=(1, 1, 512, 512)
+        # x = x.unsqueeze_(0)  # shape=(1, 1, 512, 512)
         y_reg = y_reg.view(1, -1)  # shape=(1, N_out)
         y_cls = y_cls.view(1, -1)  # shape=(1, 1)
         y_reg_hat, y_cls_hat = self.cnn(x)
@@ -131,14 +131,14 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
             train_index,
         ) = batch
         # need additional (batch) dimension because Flatten layer has start_dim=1
-        x = x.unsqueeze_(0)  # shape=(1, 1, 512, 512)
+        # x = x.unsqueeze_(0)  # shape=(1, 1, 512, 512)
         y_reg = y_reg.view(1, -1)  # shape=(1, N_out)
         y_cls = y_cls.view(1, -1)  # shape=(1, N_out)
         y_reg_hat, y_cls_hat = self.cnn(x)
         test_mse_loss = self.weighted_mse_loss(y_reg_hat, y_reg)
         self.accuracy(torch.sigmoid(y_cls_hat), y_cls)
         metrics = {"test_mse_loss": test_mse_loss, "test_accuracy": self.accuracy}
-        x_train = x_train.unsqueeze_(0)
+        # x_train = x_train.unsqueeze_(0)
         y_train_reg_hat = self.cnn(x_train)
         self.log_dict(metrics)
         # check overfitting
