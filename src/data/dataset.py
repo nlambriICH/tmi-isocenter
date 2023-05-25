@@ -4,6 +4,7 @@ import traceback
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
+import torch
 
 
 class Dataset:
@@ -13,6 +14,8 @@ class Dataset:
         with np.load(r"data\interim\masks2D.npz") as npz_masks2d:  # shape=(N, 512, z)
             try:
                 self.masks2d = np.array(list(npz_masks2d.values()))
+                self.masks2d = np.transpose(self.masks2d, (0, 3, 1, 2))
+
                 self.masks2d = self.normalize_ptv()
             except ValueError:
                 traceback.print_exc()
@@ -68,6 +71,7 @@ class Dataset:
         """
         norm_ptv = np.zeros_like(self.masks2d)
         for i, mask in enumerate(self.masks2d):
+            mask = mask[0]
             non_zero_values = mask[mask != 0]
             min_value = np.min(non_zero_values) if background == -1 else np.min(mask)
             max_value = np.max(non_zero_values) if background == -1 else np.max(mask)
