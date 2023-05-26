@@ -6,10 +6,12 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from src.data.processing import Processing
+from scipy import ndimage
 
-
-with np.load(r"data\raw\ptv_imgs2D.npz") as npz_masks2d:
+with np.load(r"data\raw\masks2D.npz") as npz_masks2d:
     masks = list(npz_masks2d.values())
+with np.load(r"data\raw\ptv_imgs2D.npz") as npz_masks2d:
+    ptvs = list(npz_masks2d.values())
 with np.load(r"data\interim\masks2D.npz") as npz_masks2d:
     masks_int = list(npz_masks2d.values())
 isocenters_pix = np.load(r"data\raw\isocenters_pix.npy")
@@ -273,7 +275,7 @@ def plot_img(
     isocenters_hat, jaws_X_pix_hat, jaws_Y_pix_hat = extract_original_data(output)
 
     processing_raw = Processing(
-        masks,
+        ptvs,
         isocenters_pix,
         jaws_X_pix,
         jaws_Y_pix,
@@ -394,7 +396,7 @@ def single_figure_plot(
     if not os.path.exists(eval_img_path):
         os.makedirs(eval_img_path)
 
-    plt.savefig(os.path.join(eval_img_path, f"output_test_{patient_idx}"), dpi=2000)
+    plt.savefig(os.path.join(eval_img_path, f"output_train_{patient_idx}"), dpi=2000)
     plt.close()
 
 
@@ -480,33 +482,19 @@ def separate_plots(
 
 def find_x_coord(masks_int: np.ndarray) -> float:
     """
-    Calculates the normalized x-coordinate based on non-zero values in a 2D array.
+        Find the x-coordinate of the center of mass of the given binary masks.
 
     Args:
-        masks_int (ndarray): A 2D NumPy array representing the input masks.
+        masks_int (np.ndarray): A numpy array representing binary masks.
 
     Returns:
-        float or None: The normalized x-coordinate if non-zero values are found in the array, or None otherwise.
-
-    The function iterates over the rows of the input array and identifies the first and last row
-    that contain more than 2 non-zero values. It then calculates the midpoint between these rows
-    and normalizes it based on the total number of rows in the array.
-
-    If no non-zero values are found, the function returns float("inf").
+        float: The normalized x-coordinate of the center of mass.
 
     """
-    first_non_zero_value = float("inf")
-    last_non_zero_value = float("-inf")
 
-    for i, row in enumerate(masks_int):
-        if row.sum() > 2:
-            first_non_zero_value = min(first_non_zero_value, i)
-            last_non_zero_value = max(last_non_zero_value, i)
-
-    if first_non_zero_value == float("inf"):
-        return float("inf")  # Return float('inf') if all row.sum() <= 2
-
-    x_coord = (first_non_zero_value + last_non_zero_value) / 2
+    x_coord = round(
+        ndimage.center_of_mass(masks_int)[0]  # pyright: ignore[reportGeneralTypeIssues]
+    )
 
     return x_coord / masks_int.shape[0]  # Normalize the coordinate
 
