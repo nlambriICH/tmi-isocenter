@@ -19,7 +19,7 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
         mse_loss_weight=5.0,
         bcelogits_loss_weight=1.0,
         weight=2,
-        Act_fun="RELU + weights on z_iso",
+        Act_fun="RELU + weights on arms",
         filters=1,
     ):
         """Initialize the LitCNN module

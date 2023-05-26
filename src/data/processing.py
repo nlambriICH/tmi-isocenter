@@ -73,7 +73,9 @@ class Processing:
                 image=mask2d, keypoints=iso_kps_img
             )  # pyright: ignore[reportGeneralTypeIssues]
             masks_aug.append(mask_aug)
-            isos_kps_temp = iso_kps_img_aug.to_xy_array()
+            isos_kps_temp = (
+                iso_kps_img_aug.to_xy_array()  # pyright: ignore[reportGeneralTypeIssues]
+            )
 
             # Swap columns to original dicom coordinate system
             isos_kps_temp[:, [1, 0]] = isos_kps_temp[:, [0, 1]]
@@ -187,7 +189,9 @@ class Processing:
                 image=mask2d, keypoints=iso_kps_img
             )  # pyright: ignore[reportGeneralTypeIssues]
             masks_aug.append(mask_aug)
-            isos_kps_temp = iso_kps_img_aug.to_xy_array()
+            isos_kps_temp = (
+                iso_kps_img_aug.to_xy_array()  # pyright: ignore[reportGeneralTypeIssues]
+            )
             # Swap columns to original dicom coordinate system
             isos_kps_temp[:, [1, 0]] = isos_kps_temp[:, [0, 1]]
             isos_kps_img_aug3D[i] = np.insert(isos_kps_temp, 1, iso_pix[:, 1], axis=1)
@@ -420,8 +424,10 @@ class Processing:
         mask_aug, iso_kps_img_aug = aug.augment(
             image=mask2d, keypoints=iso_kps_img
         )  # pyright: ignore[reportGeneralTypeIssues]
-        masks_aug.append(mask_aug)
-        isos_kps_temp = iso_kps_img_aug.to_xy_array()
+        masks_aug.append(mask_aug)  # pyright: ignore[reportGeneralTypeIssues]
+        isos_kps_temp = (
+            iso_kps_img_aug.to_xy_array()  # pyright: ignore[reportGeneralTypeIssues]
+        )
         isos_kps_temp[get_zero_row_idx(iso_pix)] = 0
 
         isos_kps_img_aug3D[i] = np.insert(isos_kps_temp, 1, iso_pix[:, 1], axis=1)
@@ -470,15 +476,23 @@ class Processing:
 
 
 if __name__ == "__main__":
-    with np.load(r"data\raw\ptv_imgs2D.npz") as npz_masks2d:
+    with np.load(r"data\raw\ptv_imgs2D.npz") as npz_pvt2d:
+        pvts = list(npz_pvt2d.values())
+    with np.load(r"data\raw\masks2D.npz") as npz_masks2d:
         masks = list(npz_masks2d.values())
     isocenters_pix = np.load(r"data\raw\isocenters_pix.npy")
     jaws_X_pix = np.load(r"data\raw\jaws_X_pix.npy")
     jaws_Y_pix = np.load(r"data\raw\jaws_Y_pix.npy")
     coll_angles = np.load(r"data\raw\angles.npy")
+    mask_imgs = []
+    for pvt, mask in zip(pvts, masks):
+        channel1 = pvt[:, :, np.newaxis]
+        channel2 = mask[:, :, np.newaxis]
+        image = np.concatenate((channel1, channel2), axis=2)
+        mask_imgs.append(image)
 
     processing = Processing(
-        masks,
+        mask_imgs,
         isocenters_pix,
         jaws_X_pix,
         jaws_Y_pix,
