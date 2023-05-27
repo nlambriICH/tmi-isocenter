@@ -8,12 +8,10 @@ import matplotlib.patches as mpatches
 from src.data.processing import Processing
 from scipy import ndimage
 
-with np.load(r"data\raw\masks2D.npz") as npz_masks2d:
-    masks = list(npz_masks2d.values())
+with np.load(r"data\raw\ptv_masks2D.npz") as npz_masks2d:
+    ptv_masks = list(npz_masks2d.values())
 with np.load(r"data\raw\ptv_imgs2D.npz") as npz_masks2d:
     ptvs = list(npz_masks2d.values())
-with np.load(r"data\interim\masks2D.npz") as npz_masks2d:
-    masks_int = list(npz_masks2d.values())
 isocenters_pix = np.load(r"data\raw\isocenters_pix.npy")
 jaws_X_pix = np.load(r"data\raw\jaws_X_pix.npy")
 jaws_Y_pix = np.load(r"data\raw\jaws_Y_pix.npy")
@@ -31,7 +29,7 @@ def build_output(y_hat: torch.Tensor, patient_idx: int) -> torch.Tensor:
     index_X = [0, 3, 6, 9, 12, 15, 18, 21, 24, 27]
     index_Y = [1, 4, 7, 10, 13, 16, 19, 22, 25, 28]
     output[index_X] = find_x_coord(
-        masks[patient_idx]
+        ptv_masks[patient_idx]
     )  # x coord repeated 8 times + 2 times for iso thorax
     output[
         index_Y

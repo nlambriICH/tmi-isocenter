@@ -17,6 +17,7 @@ from src.config.constants import (
     MAP_ID_PTV,
     MAP_ID_JUNCTION,
     DICOM_PATH,
+    MAP_ID_LUNGS,
 )
 from src.utils.field_geometry_transf import transform_field_geometry
 
@@ -83,6 +84,97 @@ def get_ptv_mask_3d(
         )
 
     return mask_3d_ptv | mask_3d_junction
+
+
+def filter_brain_name(name: str) -> bool:
+    name_lower = name.lower()
+    return (
+        "encefalo" in name_lower or "brain" in name_lower
+    ) and "brainstem" not in name_lower
+
+
+def filter_lung_name(name: str) -> bool:
+    name_lower = name.lower()
+    return "polmone" in name_lower or "lung" in name_lower
+
+
+def filter_liver_name(name: str) -> bool:
+    name_lower = name.lower()
+    return "fegato" in name_lower or "liver" in name_lower
+
+
+def filter_bladder_name(name: str) -> bool:
+    name_lower = name.lower()
+    return "vescica" in name_lower or "bladder" in name_lower
+
+
+def get_oars_masks_3d(
+    rtstruct: RTStruct, patient_id: str, array_like: np.ndarray
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Retrieve masks for specific organs at risk (OARs) from an RTStruct object.
+
+    Args:
+        rtstruct (RTStruct): An RTStruct object containing the region of interest (ROI) information.
+        patient_id (str): The ID of the patient.
+        array_like (np.ndarray): Array to construct empty masks in case of missing contours
+
+    Returns:
+        Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]: A tuple containing the masks for brain, lungs, liver, and bladder, respectively.
+
+    The function retrieves the masks for the following OARs:
+    - Brain: The mask is obtained by searching for the first ROI with a name that matches the brain criteria.
+    - Lungs: The mask is obtained by combining the masks of all lung ROIs found in the RTStruct object.
+        If the patient ID is known and lung mapping information is available, the function uses the mapped lung names;
+        otherwise, it filters the ROI names for lung criteria.
+    - Liver: The mask is obtained by searching for the first ROI with a name that matches the liver criteria.
+    - Bladder: The mask is obtained by searching for the first ROI with a name that matches the bladder criteria.
+    """
+    roi_name_list = rtstruct.get_roi_names()
+
+    try:
+        mask_3d_brain = rtstruct.get_roi_mask_by_name(
+            next(filter(filter_brain_name, roi_name_list), None)
+        )
+    except AttributeError:
+        print("No contours for brain ROI. Assign to mask of zeros")
+        mask_3d_brain = np.zeros_like(array_like)
+
+    try:
+        lungs_names = (
+            MAP_ID_LUNGS[patient_id]
+            if patient_id in MAP_ID_LUNGS
+            else list(filter(filter_lung_name, roi_name_list))
+        )
+        mask_3d_lungs = rtstruct.get_roi_mask_by_name(
+            lungs_names[0]
+        ) | rtstruct.get_roi_mask_by_name(lungs_names[1])
+    except AttributeError:
+        print("No contours for lungs ROIs. Assign to mask of zeros")
+        mask_3d_lungs = np.zeros_like(array_like)
+
+    try:
+        mask_3d_liver = rtstruct.get_roi_mask_by_name(
+            next(filter(filter_liver_name, roi_name_list), None)
+        )
+    except AttributeError:
+        print("No contours for liver ROI. Assign to mask of zeros")
+        mask_3d_liver = np.zeros_like(array_like)
+
+    try:
+        mask_3d_bladder = rtstruct.get_roi_mask_by_name(
+            next(filter(filter_bladder_name, roi_name_list), None)
+        )
+    except AttributeError:
+        print("No contours for bladder ROI. Assign to mask of zeros")
+        mask_3d_bladder = np.zeros_like(array_like)
+
+    return (
+        mask_3d_brain,
+        mask_3d_lungs,
+        mask_3d_liver,
+        mask_3d_bladder,
+    )
 
 
 def get_dicom_field_geometry(
@@ -248,7 +340,7 @@ def get_dicom_field_geometry(
     return isocenters, jaw_X, jaw_Y, coll_angle
 
 
-def get_ptv_image_3d(series_data: list[Dataset], mask_3d: np.ndarray) -> np.ndarray:
+def get_masked_image_3d(series_data: list[Dataset], mask_3d: np.ndarray) -> np.ndarray:
     """
     Generate a 3D image from a list of 2D image datasets and apply a mask.
 
@@ -274,7 +366,9 @@ def get_ptv_image_3d(series_data: list[Dataset], mask_3d: np.ndarray) -> np.ndar
     return img_3d * mask_3d
 
 
-def read_dicoms() -> tuple[list, list, list, list, list, list, list]:
+def read_dicoms() -> (
+    tuple[list, list, list, list, list, list, list, list, list, list, list]
+):
     """
     Read DICOM files and extract relevant raw information for model training.
 
@@ -283,12 +377,16 @@ def read_dicoms() -> tuple[list, list, list, list, list, list, list]:
             - patient_info: List of tuples, where each tuple contains information about a patient, including
                             patient ID, PTV name, junction names, RT plan label, study date, isocenter arm flag,
                             collimator angle flag, and the dimensions of the corresponding mask.
-            - masks: List of 2D arrays representing the PTV mask for each patient in the input directory.
+            - ptv_masks: List of 2D arrays representing the PTV mask for each patient in the input directory.
             - ptv_imgs: List of 2D arrays representing the PTV density for each patient in the input directory.
             - isocenters_pix: List of 3D arrays representing the isocenter pixel coordinates for each patient.
             - jaws_X_pix: List of 2D arrays representing the X aperture pixel coordinates for each patient.
             - jaws_Y_pix: List of 2D arrays representing the Y aperture pixel coordinates for each patient.
             - angles: List of arrays representing the collimator angles for each patient.
+            - brain_masks: List of 2D arrays representing the brain mask for each patient in the input directory.
+            - lungs_masks: List of 2D arrays representing the lungs mask for each patient in the input directory.
+            - liver_masks: List of 2D arrays representing the liver mask for each patient in the input directory.
+            - bladder_masks: List of 2D arrays representing the bladder mask for each patient in the input directory.
 
     Raises:
         AssertionError: If the loaded DICOM files do not meet certain requirements, such as all isocenter pixel
@@ -296,12 +394,16 @@ def read_dicoms() -> tuple[list, list, list, list, list, list, list]:
                         between DICOM and patient coordinate systems.
     """
     patient_info = []
-    masks = []
+    ptv_masks = []
     ptv_imgs = []
     isocenters_pix = []
     jaws_X_pix = []
     jaws_Y_pix = []
     angles = []
+    brain_masks = []
+    lungs_masks = []
+    liver_masks = []
+    bladder_masks = []
 
     axis_direction = np.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
 
@@ -331,7 +433,7 @@ def read_dicoms() -> tuple[list, list, list, list, list, list, list]:
             else list(filter(filter_junction_name, rtstruct.get_roi_names()))
         )
 
-        mask_3d = get_ptv_mask_3d(
+        ptv_mask_3d = get_ptv_mask_3d(
             rtstruct, ptv_name, junction_names
         )  # axis0=y, axis1=x, axis2=z
 
@@ -346,7 +448,8 @@ def read_dicoms() -> tuple[list, list, list, list, list, list, list]:
             [
                 x == y
                 for (x, y) in zip(
-                    get_slice_directions(rtstruct.series_data[0]), axis_direction
+                    get_slice_directions(rtstruct.series_data[0]),
+                    axis_direction,  # pyright: ignore[reportGeneralTypeIssues]
                 )
             ]
         )
@@ -373,23 +476,31 @@ def read_dicoms() -> tuple[list, list, list, list, list, list, list]:
         # between the PTV mask of all coronal slices
         # TODO: investigate whether the use of a 3D PTV mask
         # can improve the performance of the model
-        mask_2d = mask_3d.any(axis=0)
+        ptv_mask_2d = ptv_mask_3d.any(axis=0)
 
         # Saving the HU density of PTV in coronal plane (i.e., (x, z) plane)
         # The 2D img is the average of non-zero pixel_array values contained in the PTV along the y axis
         # Taking the mean of empty slices (all elements == 0) gives np.nan and warnings from NumPy
-        ptv_img_3d = get_ptv_image_3d(rtstruct.series_data, mask_3d)
+        ptv_img_3d = get_masked_image_3d(rtstruct.series_data, ptv_mask_3d)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=RuntimeWarning)
             ptv_img_2d = ptv_img_3d.mean(axis=0, where=ptv_img_3d != 0)
         ptv_img_2d = np.nan_to_num(ptv_img_2d)
 
-        masks.append(mask_2d)
+        ptv_masks.append(ptv_mask_2d)
         ptv_imgs.append(ptv_img_2d)
         isocenters_pix.append(iso_pixel)
         jaws_X_pix.append(jaw_X_pixel)
         jaws_Y_pix.append(jaw_Y_pixel)
         angles.append(coll_angles)
+
+        # Saving the coronal projections also for the OARs masks
+        oars_masks_3d = get_oars_masks_3d(rtstruct, patient_id, ptv_mask_3d)
+        for (
+            oar_mask_3d,  # pyright: ignore[reportGeneralTypeIssues]
+            oar_masks_list,
+        ) in zip(oars_masks_3d, (brain_masks, lungs_masks, liver_masks, bladder_masks)):
+            oar_masks_list.append(oar_mask_3d.any(axis=0))
 
         first_slice = rtstruct.series_data[0]
         assert np.all(
@@ -414,26 +525,42 @@ def read_dicoms() -> tuple[list, list, list, list, list, list, list]:
                 0
                 if np.all(coll_angles[:2] == 90)
                 else 1,  # 5/355° coll angle on pelvis
-                mask_3d.shape[0],
-                mask_3d.shape[1],
-                mask_3d.shape[2],
+                ptv_mask_3d.shape[0],
+                ptv_mask_3d.shape[1],
+                ptv_mask_3d.shape[2],
                 slice_spacing,
                 first_slice.PixelSpacing[0],
             )
         )
 
-    return patient_info, masks, ptv_imgs, isocenters_pix, jaws_X_pix, jaws_Y_pix, angles
-
-
-if __name__ == "__main__":
-    (
+    return (
         patient_info,
-        masks,
+        ptv_masks,
         ptv_imgs,
         isocenters_pix,
         jaws_X_pix,
         jaws_Y_pix,
         angles,
+        brain_masks,
+        lungs_masks,
+        liver_masks,
+        bladder_masks,
+    )
+
+
+if __name__ == "__main__":
+    (
+        patient_info,
+        ptv_masks,
+        ptv_imgs,
+        isocenters_pix,
+        jaws_X_pix,
+        jaws_Y_pix,
+        angles,
+        brain_masks,
+        lungs_masks,
+        liver_masks,
+        bladder_masks,
     ) = read_dicoms()
 
     if not os.path.exists(r"data\raw"):
@@ -456,13 +583,15 @@ if __name__ == "__main__":
             "PixelSpacing",
         ),
     ).to_csv(r"data\patient_info.csv")
-    np.savez(
-        r"data\raw\masks2D.npz", *masks
-    )  # unpack the list to pass the mask2D arrays as positional arguments
-    np.savez(
-        r"data\raw\ptv_imgs2D.npz", *ptv_imgs
-    )  # unpack the list to pass the ptv_imgs2D arrays as positional arguments
+
+    # With np.savez we unpack the list to pass the 2D arrays as positional arguments
+    np.savez(r"data\raw\ptv_masks2D.npz", *ptv_masks)
+    np.savez(r"data\raw\ptv_imgs2D.npz", *ptv_imgs)
     np.save(r"data\raw\isocenters_pix.npy", np.array(isocenters_pix))
     np.save(r"data\raw\jaws_X_pix.npy", np.array(jaws_X_pix))
     np.save(r"data\raw\jaws_Y_pix.npy", np.array(jaws_Y_pix))
     np.save(r"data\raw\angles.npy", np.array(angles))
+    np.savez(r"data\raw\brain_masks2D.npz", *brain_masks)
+    np.savez(r"data\raw\lungs_masks2D.npz", *lungs_masks)
+    np.savez(r"data\raw\liver_masks2D.npz", *liver_masks)
+    np.savez(r"data\raw\bladder_masks2D.npz", *bladder_masks)
