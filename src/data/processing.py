@@ -476,18 +476,18 @@ class Processing:
 
 
 if __name__ == "__main__":
-    with np.load(r"data\raw\ptv_imgs2D.npz") as npz_pvt2d:
-        pvts = list(npz_pvt2d.values())
-    with np.load(r"data\raw\masks2D.npz") as npz_masks2d:
-        masks = list(npz_masks2d.values())
+    with np.load(r"data\raw\ptv_imgs2D.npz") as npz_ptv2d:
+        ptv_imgs = list(npz_ptv2d.values())
+    with np.load(r"data\raw\ptv_masks2D.npz") as npz_masks2d:
+        ptv_masks = list(npz_masks2d.values())
     isocenters_pix = np.load(r"data\raw\isocenters_pix.npy")
     jaws_X_pix = np.load(r"data\raw\jaws_X_pix.npy")
     jaws_Y_pix = np.load(r"data\raw\jaws_Y_pix.npy")
     coll_angles = np.load(r"data\raw\angles.npy")
     mask_imgs = []
-    for pvt, mask in zip(pvts, masks):
-        channel1 = pvt[:, :, np.newaxis]
-        channel2 = mask[:, :, np.newaxis]
+    for ptv_img, ptv_mask in zip(ptv_imgs, ptv_masks):
+        channel1 = ptv_img[:, :, np.newaxis]
+        channel2 = ptv_mask[:, :, np.newaxis]
         image = np.concatenate((channel1, channel2), axis=2)
         mask_imgs.append(image)
 
