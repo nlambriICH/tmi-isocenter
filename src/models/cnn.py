@@ -6,31 +6,31 @@ import torch
 class CNN(nn.Module):
     """Simple CNN for model testing"""
 
-    def __init__(self):
+    def __init__(self, filters: int, Act_fun=nn.ReLU()):
         super().__init__()
         self.simple_cnn = nn.Sequential(
             nn.Conv2d(
-                2,
-                16,
+                3,
+                filters,
                 8,
             ),
-            nn.ReLU(),
+            Act_fun,
             nn.Conv2d(
-                16,
-                16,
+                filters,
+                filters,
                 8,
             ),
-            nn.ReLU(),
+            Act_fun,
             nn.MaxPool2d(2),
         )
 
         self.regression_head = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(16 * 249 * 249, 39),
+            nn.Linear(filters * 249 * 249, 39),
         )
         self.classification_head = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(16 * 249 * 249, 1),
+            nn.Linear(filters * 249 * 249, 1),
         )
 
     def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:

@@ -3,6 +3,7 @@ import os
 import lightning.pytorch as pl
 import torch.nn.functional as F
 import torch
+from torch import nn
 from torchmetrics.classification import BinaryAccuracy
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.optim import Adam
@@ -18,9 +19,10 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
         learning_rate=1e-5,
         mse_loss_weight=5.0,
         bcelogits_loss_weight=1.0,
-        weight=2,
-        Act_fun="RELU + weights on arms",
-        filters=1,
+        weight=1,
+        Act_fun=nn.ReLU(),
+        focus_on=[0, 1],
+        filters=16,
     ):
         """Initialize the LitCNN module
 
@@ -30,15 +32,15 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
         """
         super().__init__()
         self.example_input_array = torch.Tensor(
-            32, 2, 512, 512
+            32, 3, 512, 512
         )  # display the intermediate input and output sizes of layers when trainer.fit() is called
-        self.cnn = CNN()
+        self.cnn = CNN(filters, Act_fun)
         self.accuracy = BinaryAccuracy()
         self.learning_rate = learning_rate
         self.train_mse_weight = mse_loss_weight
         self.bcelogits_loss_weight = bcelogits_loss_weight
         self.weights = torch.ones(39)
-        self.weights[[0, 1]] = weight
+        self.weights[focus_on] = weight
         self.save_hyperparameters()
         self.filters = filters
 
@@ -151,6 +153,7 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
             int(test_idx.item()),
             y_reg_hat[0],
             self.logger.log_dir,  # pyright: ignore[reportGeneralTypeIssues,reportOptionalMemberAccess]
+            mse=test_mse_loss,
         )
 
     def forward(  # pylint: disable=arguments-differ
