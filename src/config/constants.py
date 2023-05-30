@@ -10,6 +10,7 @@ with open(constants_json_path, "r") as file:
 
 PTV_EXCLUDE_SUBSTRINGS: list[str] = data["ptv_exclude_substrings"]
 MAP_ID_PTV: dict[str, str] = data["map_id_ptv"]
-MAP_ID_JUNCTION: dict[str, str] = data["map_id_junction"]
+MAP_ID_JUNCTION: dict[str, None | str | list[str]] = data["map_id_junction"]
 DICOM_PATH: str = data["dicom_path"]
 DICOM_DIR_TEST_PATH: str = data["dicom_dir_test_path"]
+MAP_ID_LUNGS: dict[str, list[str]] = data["map_lung_roi_name"]

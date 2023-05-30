@@ -73,7 +73,9 @@ class Processing:
                 image=mask2d, keypoints=iso_kps_img
             )  # pyright: ignore[reportGeneralTypeIssues]
             masks_aug.append(mask_aug)
-            isos_kps_temp = iso_kps_img_aug.to_xy_array()
+            isos_kps_temp = (
+                iso_kps_img_aug.to_xy_array()  # pyright: ignore[reportGeneralTypeIssues]
+            )
 
             # Swap columns to original dicom coordinate system
             isos_kps_temp[:, [1, 0]] = isos_kps_temp[:, [0, 1]]
@@ -187,7 +189,9 @@ class Processing:
                 image=mask2d, keypoints=iso_kps_img
             )  # pyright: ignore[reportGeneralTypeIssues]
             masks_aug.append(mask_aug)
-            isos_kps_temp = iso_kps_img_aug.to_xy_array()
+            isos_kps_temp = (
+                iso_kps_img_aug.to_xy_array()  # pyright: ignore[reportGeneralTypeIssues]
+            )
             # Swap columns to original dicom coordinate system
             isos_kps_temp[:, [1, 0]] = isos_kps_temp[:, [0, 1]]
             isos_kps_img_aug3D[i] = np.insert(isos_kps_temp, 1, iso_pix[:, 1], axis=1)
@@ -420,8 +424,10 @@ class Processing:
         mask_aug, iso_kps_img_aug = aug.augment(
             image=mask2d, keypoints=iso_kps_img
         )  # pyright: ignore[reportGeneralTypeIssues]
-        masks_aug.append(mask_aug)
-        isos_kps_temp = iso_kps_img_aug.to_xy_array()
+        masks_aug.append(mask_aug)  # pyright: ignore[reportGeneralTypeIssues]
+        isos_kps_temp = (
+            iso_kps_img_aug.to_xy_array()  # pyright: ignore[reportGeneralTypeIssues]
+        )
         isos_kps_temp[get_zero_row_idx(iso_pix)] = 0
 
         isos_kps_img_aug3D[i] = np.insert(isos_kps_temp, 1, iso_pix[:, 1], axis=1)
@@ -438,47 +444,107 @@ class Processing:
             None.
         """
 
-        if not os.path.exists(r"\tmi-isocenter\data\interim"):
-            os.makedirs(r"\tmi-isocenter\data\interim")
+        if not os.path.exists(r"data\interim"):
+            os.makedirs(r"data\interim")
 
         np.savez(
-            r"\tmi-isocenter\data\interim\masks2D.npz", *self.masks
+            r"data\interim\masks2D.npz", *self.masks
         )  # unpack the list to pass the mask2D arrays as positional arguments
-        np.save(r"\tmi-isocenter\data\interim\isocenters_pix.npy", self.isocenters_pix)
-        np.save(r"\tmi-isocenter\data\interim\jaws_X_pix.npy", self.jaws_X_pix)
-        np.save(r"\tmi-isocenter\data\interim\jaws_Y_pix.npy", self.jaws_Y_pix)
-        np.save(r"\tmi-isocenter\data\interim\angles.npy", self.coll_angles)
+        np.save(r"data\interim\isocenters_pix.npy", self.isocenters_pix)
+        np.save(r"data\interim\jaws_X_pix.npy", self.jaws_X_pix)
+        np.save(r"data\interim\jaws_Y_pix.npy", self.jaws_Y_pix)
+        np.save(r"data\interim\angles.npy", self.coll_angles)
 
-    # TODO: remove duplicate information of x and z coords.
-    # For the moment keep all x- and z-coords of the isocenters:
-    # - z coord is the same for isocenter groups
-    # - x coord is the same for the isocenters of the body
-    def get_relevant_isocenters(self, iso_kps_img: np.ndarray) -> np.ndarray:
-        # z coordinates (even indexes) from pelvis to head
-        # x coordinate is the same between different isocenters (index 1)
-        # except for the isocenters on the arms (indexes 11 and 13)
-        relevant_indexes = [1, 11, 13, 0, 2, 4, 6, 8, 10, 12]
 
-        if iso_kps_img.ndim == 2:
-            return iso_kps_img.ravel()[relevant_indexes]
-        elif iso_kps_img.ndim == 3:
-            return iso_kps_img[:, relevant_indexes, :]
-        else:
-            raise ValueError(
-                f"Expected an array of ndim == 2 or 3, but got an array with ndim={iso_kps_img.ndim}"
-            )
+def load_masks() -> list[np.ndarray]:
+    """
+    Load and process mask images from the specified paths.
+
+    Returns:
+        List[np.ndarray]: A list of processed mask images.
+
+    Raises:
+        None.
+
+    The function loads mask images from the following paths:
+    - "ptv_imgs": Path to the npz file containing the PTV (Planning Target Volume) images.
+    - "ptv_masks": Path to the npz file containing the PTV masks.
+    - "brain_masks": Path to the npz file containing the brain masks.
+    - "lungs_masks": Path to the npz file containing the lung masks.
+    - "liver_masks": Path to the npz file containing the liver masks.
+    - "bladder_masks": Path to the npz file containing the bladder masks.
+
+    Each mask image is processed by combining multiple channels:
+    - Channel 1: PTV image.
+    - Channel 2: PTV mask.
+    - Channel 3: Brain mask multiplied by 3.
+    - Channel 4: Bladder mask multiplied by 4.
+    - Channel 5: Lung mask multiplied by 5.
+    - Channel 6: Liver mask multiplied by 6.
+
+    The processed mask images are obtained by concatenating the channels along axis 2.
+
+    The function returns a list of processed mask images.
+    """
+    raw_data = {
+        "ptv_imgs": r"data\raw\ptv_imgs2D.npz",
+        "ptv_masks": r"data\raw\ptv_masks2D.npz",
+        "brain_masks": r"data\raw\brain_masks2D.npz",
+        "lungs_masks": r"data\raw\lungs_masks2D.npz",
+        "liver_masks": r"data\raw\liver_masks2D.npz",
+        "bladder_masks": r"data\raw\bladder_masks2D.npz",
+    }
+
+    loaded_masks = {}
+    for key, path in raw_data.items():
+        with np.load(path) as npz_data:
+            loaded_masks[key] = list(npz_data.values())
+
+    mask_imgs = []
+    for (
+        ptv_img,
+        ptv_mask,
+        brain_mask,
+        bladder_mask,
+        lungs_mask,
+        liver_mask,
+    ) in zip(
+        loaded_masks["ptv_imgs"],
+        loaded_masks["ptv_masks"],
+        loaded_masks["brain_masks"],
+        loaded_masks["bladder_masks"],
+        loaded_masks["lungs_masks"],
+        loaded_masks["liver_masks"],
+    ):
+        channel1 = ptv_img[:, :, np.newaxis]
+        channel2 = ptv_mask[:, :, np.newaxis]
+        channel3 = 3 * brain_mask[:, :, np.newaxis]
+        channel4 = 4 * bladder_mask[:, :, np.newaxis]
+        channel5 = 5 * lungs_mask[:, :, np.newaxis]
+        channel6 = 6 * liver_mask[:, :, np.newaxis]
+        channel_overlap = channel3 + channel4 + channel5 + channel6
+        image = np.concatenate(
+            (
+                channel1,
+                channel2,
+                channel_overlap,
+            ),
+            axis=2,
+        )
+        mask_imgs.append(image)
+
+    return mask_imgs
 
 
 if __name__ == "__main__":
-    with np.load(r"\tmi-isocenter\data\raw\masks2D.npz") as npz_masks2d:
-        masks = list(npz_masks2d.values())
-    isocenters_pix = np.load(r"\tmi-isocenter\data\raw\isocenters_pix.npy")
-    jaws_X_pix = np.load(r"\tmi-isocenter\data\raw\jaws_X_pix.npy")
-    jaws_Y_pix = np.load(r"\tmi-isocenter\data\raw\jaws_Y_pix.npy")
-    coll_angles = np.load(r"\tmi-isocenter\data\raw\angles.npy")
+    mask_imgs = load_masks()
+    isocenters_pix = np.load(r"data\raw\isocenters_pix.npy")
+    jaws_X_pix = np.load(r"data\raw\jaws_X_pix.npy")
+    jaws_Y_pix = np.load(r"data\raw\jaws_Y_pix.npy")
+    coll_angles = np.load(r"data\raw\angles.npy")
 
     processing = Processing(
-        masks,
+        mask_imgs,
         isocenters_pix,
         jaws_X_pix,
         jaws_Y_pix,
