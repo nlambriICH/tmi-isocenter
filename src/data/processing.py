@@ -476,19 +476,55 @@ class Processing:
 
 
 if __name__ == "__main__":
-    with np.load(r"data\raw\ptv_imgs2D.npz") as npz_ptv2d:
-        ptv_imgs = list(npz_ptv2d.values())
-    with np.load(r"data\raw\ptv_masks2D.npz") as npz_masks2d:
-        ptv_masks = list(npz_masks2d.values())
+    datasets = {
+        "ptv_imgs": r"data\raw\ptv_imgs2D.npz",
+        "ptv_masks": r"data\raw\ptv_masks2D.npz",
+        "brain_masks": r"data\raw\brain_masks2D.npz",
+        "bladder_masks": r"data\raw\bladder_masks2D.npz",
+        "lungs_masks": r"data\raw\lungs_masks2D.npz",
+        "liver_masks": r"data\raw\liver_masks2D.npz",
+    }
+
+    loaded_data = {}
+    for key, path in datasets.items():
+        with np.load(path) as npz_data:
+            loaded_data[key] = list(npz_data.values())
+
     isocenters_pix = np.load(r"data\raw\isocenters_pix.npy")
     jaws_X_pix = np.load(r"data\raw\jaws_X_pix.npy")
     jaws_Y_pix = np.load(r"data\raw\jaws_Y_pix.npy")
     coll_angles = np.load(r"data\raw\angles.npy")
     mask_imgs = []
-    for ptv_img, ptv_mask in zip(ptv_imgs, ptv_masks):
+    for (
+        ptv_img,
+        ptv_mask,
+        brain_mask,
+        bladder_mask,
+        lungs_mask,
+        liver_mask,
+    ) in zip(
+        loaded_data["ptv_imgs"],
+        loaded_data["ptv_masks"],
+        loaded_data["brain_masks"],
+        loaded_data["bladder_masks"],
+        loaded_data["lungs_masks"],
+        loaded_data["liver_masks"],
+    ):
         channel1 = ptv_img[:, :, np.newaxis]
         channel2 = ptv_mask[:, :, np.newaxis]
-        image = np.concatenate((channel1, channel2), axis=2)
+        channel3 = 3 * brain_mask[:, :, np.newaxis]
+        channel4 = 4 * bladder_mask[:, :, np.newaxis]
+        channel5 = 5 * lungs_mask[:, :, np.newaxis]
+        channel6 = 6 * liver_mask[:, :, np.newaxis]
+        channel_overlap = channel3 + channel4 + channel5 + channel6
+        image = np.concatenate(
+            (
+                channel1,
+                channel2,
+                channel_overlap,
+            ),
+            axis=2,
+        )
         mask_imgs.append(image)
 
     processing = Processing(

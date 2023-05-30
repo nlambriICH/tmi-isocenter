@@ -64,8 +64,8 @@ if __name__ == "__main__":
             y_reg_test,
             y_cls_test,
             test_idx,
-            masks_train[0:10],
-            train_index[0:10],
+            masks_train[0:11],
+            train_index[0:11],
         ),
         num_workers=1,
     )
@@ -73,7 +73,7 @@ if __name__ == "__main__":
     lightning_cnn = LitCNN()
     trainer = pl.Trainer(
         callbacks=[  # pyright: ignore[reportGeneralTypeIssues]
-            EarlyStopping(monitor="val_mse_loss", mode="min", patience=10),
+            EarlyStopping(monitor="val_mse_loss", mode="min", patience=7),
             ModelSummary(
                 max_depth=-1
             ),  # print the weights summary of the model when trainer.fit() is called
