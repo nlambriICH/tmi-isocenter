@@ -240,7 +240,11 @@ def plot_fields(
 
 
 def plot_img(
-    patient_idx: int, output: torch.Tensor, path: str, single_fig: bool = False
+    patient_idx: int,
+    output: torch.Tensor,
+    path: str,
+    mse: torch.Tensor = torch.tensor(0),
+    single_fig: bool = False,
 ) -> None:
     """
     Generates and saves a plot of two images for a given patient: the original image and a transformed image.
@@ -319,6 +323,7 @@ def plot_img(
             processing_output,
             pix_spacing,  # pyright: ignore[reportGeneralTypeIssues]
             slice_thickness,  # pyright: ignore[reportGeneralTypeIssues]
+            mse=mse,
         )
 
 
@@ -405,6 +410,7 @@ def separate_plots(
     processing_output: Processing,
     pix_spacing: float,
     slice_thickness: float,
+    mse: torch.Tensor = torch.tensor(0),
 ) -> None:
     """
     Plot the predicted and true isocenters, jaws, and mask of a single patient, in two different files png,
@@ -443,6 +449,8 @@ def separate_plots(
         slice_thickness,
         pix_spacing,
     )
+    title = "test_mse_loss:" + str(mse)
+    plt.title(title)
     predict_img_path = os.path.join(path, "predict_img")
     if not os.path.exists(predict_img_path):
         os.makedirs(predict_img_path)
@@ -594,4 +602,4 @@ if __name__ == "__main__":
     assert reconstructed_output.shape[0] == 84
 
     path = "test"
-    plot_img(patient_idx, output, path)
+    plot_img(patient_idx, output, path, mse=torch.tensor(0))
