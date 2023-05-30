@@ -256,6 +256,8 @@ def plot_img(
             A 1D NumPy array containing the output of a model for the specified patient.
         path : str
             The path where the plot image will be saved.
+        mse: torch.Tensor
+            MSE loss added in the figure title of separate plots.
         single_fig : bool
             Whether to plot ground thruth and predictions in the same image
 
@@ -425,6 +427,7 @@ def separate_plots(
     angles.
     - pix_spacing (float): Pixel spacing of the CT images.
     - slice_thickness (float): Slice thickness of the CT images.
+    - mse (torch.Tensor): MSE loss added in the figure title.
 
     Returns:
     - None: The function saves the plot to disk, then closes it.
@@ -449,8 +452,7 @@ def separate_plots(
         slice_thickness,
         pix_spacing,
     )
-    title = "test_mse_loss:" + str(mse)
-    plt.title(title)
+    plt.title(f"MSE loss: {mse}")
     predict_img_path = os.path.join(path, "predict_img")
     if not os.path.exists(predict_img_path):
         os.makedirs(predict_img_path)
@@ -602,4 +604,4 @@ if __name__ == "__main__":
     assert reconstructed_output.shape[0] == 84
 
     path = "test"
-    plot_img(patient_idx, output, path, mse=torch.tensor(0))
+    plot_img(patient_idx, output, path)

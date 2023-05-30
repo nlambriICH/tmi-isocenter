@@ -455,45 +455,51 @@ class Processing:
         np.save(r"data\interim\jaws_Y_pix.npy", self.jaws_Y_pix)
         np.save(r"data\interim\angles.npy", self.coll_angles)
 
-    # TODO: remove duplicate information of x and z coords.
-    # For the moment keep all x- and z-coords of the isocenters:
-    # - z coord is the same for isocenter groups
-    # - x coord is the same for the isocenters of the body
-    def get_relevant_isocenters(self, iso_kps_img: np.ndarray) -> np.ndarray:
-        # z coordinates (even indexes) from pelvis to head
-        # x coordinate is the same between different isocenters (index 1)
-        # except for the isocenters on the arms (indexes 11 and 13)
-        relevant_indexes = [1, 11, 13, 0, 2, 4, 6, 8, 10, 12]
 
-        if iso_kps_img.ndim == 2:
-            return iso_kps_img.ravel()[relevant_indexes]
-        elif iso_kps_img.ndim == 3:
-            return iso_kps_img[:, relevant_indexes, :]
-        else:
-            raise ValueError(
-                f"Expected an array of ndim == 2 or 3, but got an array with ndim={iso_kps_img.ndim}"
-            )
+def load_masks() -> list[np.ndarray]:
+    """
+    Load and process mask images from the specified paths.
 
+    Returns:
+        List[np.ndarray]: A list of processed mask images.
 
-if __name__ == "__main__":
-    datasets = {
+    Raises:
+        None.
+
+    The function loads mask images from the following paths:
+    - "ptv_imgs": Path to the npz file containing the PTV (Planning Target Volume) images.
+    - "ptv_masks": Path to the npz file containing the PTV masks.
+    - "brain_masks": Path to the npz file containing the brain masks.
+    - "lungs_masks": Path to the npz file containing the lung masks.
+    - "liver_masks": Path to the npz file containing the liver masks.
+    - "bladder_masks": Path to the npz file containing the bladder masks.
+
+    Each mask image is processed by combining multiple channels:
+    - Channel 1: PTV image.
+    - Channel 2: PTV mask.
+    - Channel 3: Brain mask multiplied by 3.
+    - Channel 4: Bladder mask multiplied by 4.
+    - Channel 5: Lung mask multiplied by 5.
+    - Channel 6: Liver mask multiplied by 6.
+
+    The processed mask images are obtained by concatenating the channels along axis 2.
+
+    The function returns a list of processed mask images.
+    """
+    raw_data = {
         "ptv_imgs": r"data\raw\ptv_imgs2D.npz",
         "ptv_masks": r"data\raw\ptv_masks2D.npz",
         "brain_masks": r"data\raw\brain_masks2D.npz",
-        "bladder_masks": r"data\raw\bladder_masks2D.npz",
         "lungs_masks": r"data\raw\lungs_masks2D.npz",
         "liver_masks": r"data\raw\liver_masks2D.npz",
+        "bladder_masks": r"data\raw\bladder_masks2D.npz",
     }
 
-    loaded_data = {}
-    for key, path in datasets.items():
+    loaded_masks = {}
+    for key, path in raw_data.items():
         with np.load(path) as npz_data:
-            loaded_data[key] = list(npz_data.values())
+            loaded_masks[key] = list(npz_data.values())
 
-    isocenters_pix = np.load(r"data\raw\isocenters_pix.npy")
-    jaws_X_pix = np.load(r"data\raw\jaws_X_pix.npy")
-    jaws_Y_pix = np.load(r"data\raw\jaws_Y_pix.npy")
-    coll_angles = np.load(r"data\raw\angles.npy")
     mask_imgs = []
     for (
         ptv_img,
@@ -503,12 +509,12 @@ if __name__ == "__main__":
         lungs_mask,
         liver_mask,
     ) in zip(
-        loaded_data["ptv_imgs"],
-        loaded_data["ptv_masks"],
-        loaded_data["brain_masks"],
-        loaded_data["bladder_masks"],
-        loaded_data["lungs_masks"],
-        loaded_data["liver_masks"],
+        loaded_masks["ptv_imgs"],
+        loaded_masks["ptv_masks"],
+        loaded_masks["brain_masks"],
+        loaded_masks["bladder_masks"],
+        loaded_masks["lungs_masks"],
+        loaded_masks["liver_masks"],
     ):
         channel1 = ptv_img[:, :, np.newaxis]
         channel2 = ptv_mask[:, :, np.newaxis]
@@ -526,6 +532,16 @@ if __name__ == "__main__":
             axis=2,
         )
         mask_imgs.append(image)
+
+    return mask_imgs
+
+
+if __name__ == "__main__":
+    mask_imgs = load_masks()
+    isocenters_pix = np.load(r"data\raw\isocenters_pix.npy")
+    jaws_X_pix = np.load(r"data\raw\jaws_X_pix.npy")
+    jaws_Y_pix = np.load(r"data\raw\jaws_Y_pix.npy")
+    coll_angles = np.load(r"data\raw\angles.npy")
 
     processing = Processing(
         mask_imgs,

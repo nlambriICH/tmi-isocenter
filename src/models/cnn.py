@@ -6,7 +6,7 @@ import torch
 class CNN(nn.Module):
     """Simple CNN for model testing"""
 
-    def __init__(self, filters: int, Act_fun=nn.ReLU()):
+    def __init__(self, filters: int, activation=nn.ReLU()):
         super().__init__()
         self.simple_cnn = nn.Sequential(
             nn.Conv2d(
@@ -14,13 +14,13 @@ class CNN(nn.Module):
                 filters,
                 8,
             ),
-            Act_fun,
+            activation,
             nn.Conv2d(
                 filters,
                 filters,
                 8,
             ),
-            Act_fun,
+            activation,
             nn.MaxPool2d(2),
         )
 
