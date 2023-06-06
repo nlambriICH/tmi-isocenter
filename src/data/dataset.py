@@ -40,15 +40,16 @@ class Dataset:
         # Creating the class interaction between arms and angle
         self.iso_on_arms = self.df_patient_info["IsocenterOnArms"].to_numpy()
 
-        self.arms_or_angle = np.where(
-            (self.angle_class == 0) & (self.iso_on_arms == 0),
-            0,
-            np.where(
-                (self.angle_class == 1) & (self.iso_on_arms == 0),
-                1,
-                np.where((self.angle_class == 0) & (self.iso_on_arms == 1), 2, 3),
-            ),
-        )
+        """        self.arms_or_angle = np.where(
+                    (self.angle_class == 0) & (self.iso_on_arms == 0),
+                    0,
+                    np.where(
+                        (self.angle_class == 1) & (self.iso_on_arms == 0),
+                        1,
+                        np.where((self.angle_class == 0) & (self.iso_on_arms == 1), 2, 3),
+                    ),
+                )
+        """
 
     def normalize_ptv(self, background=-1) -> np.ndarray:
         """Normalize the 2D masks of the PTV (Planning Target Volume).
@@ -188,7 +189,7 @@ class Dataset:
 
         Returns:
             np.ndarray: Array with the unique values from the input data.
-                The resulting array has a shape of (self.num_patients, 1, 42).
+                The resulting array has a shape of (self.num_patients, 1, 39).
 
         Notes:
             - The resulting array contains 11 values for the isocenters,
