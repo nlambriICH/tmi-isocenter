@@ -17,6 +17,18 @@ jaws_X_pix = np.load(r"data\raw\jaws_X_pix.npy")
 jaws_Y_pix = np.load(r"data\raw\jaws_Y_pix.npy")
 coll_angles = np.load(r"data\raw\angles.npy")
 df_patient_info = pd.read_csv(r"data\patient_info.csv")
+model_arms = True
+if model_arms:
+    # Here I'm working on the model with Iso on arms
+    iso_on_arms = df_patient_info["IsocenterOnArms"].to_numpy()
+    bool_arms = iso_on_arms.astype(bool)
+    df_patient_info = df_patient_info[bool_arms].reset_index()
+    ptvs = [mask for mask, bool_val in zip(ptvs, iso_on_arms) if bool_val]
+    isocenters_pix = isocenters_pix[bool_arms]
+    jaws_X_pix = jaws_X_pix[bool_arms]
+    jaws_Y_pix = jaws_Y_pix[bool_arms]
+    coll_angles = coll_angles[bool_arms]
+    # Ends Iso on arms part
 
 pix_spacing_col_idx = df_patient_info.columns.get_loc(key="PixelSpacing")
 slice_tickness_col_idx = df_patient_info.columns.get_loc(key="SliceThickness")
@@ -24,64 +36,134 @@ slice_tickness_col_idx = df_patient_info.columns.get_loc(key="SliceThickness")
 
 def build_output(y_hat: torch.Tensor, patient_idx: int) -> torch.Tensor:
     output = np.zeros(shape=(84))
+    if y_hat.shape[0] == 39:
+        # Isocenter indexes
+        index_X = [0, 3, 6, 9, 12, 15, 18, 21, 24, 27]
+        index_Y = [1, 4, 7, 10, 13, 16, 19, 22, 25, 28]
+        output[index_X] = find_x_coord(
+            ptv_masks[patient_idx]
+        )  # x coord repeated 8 times + 2 times for iso thorax
+        output[
+            index_Y
+        ] = 100  # y coord repeated 8 times + 2 times for iso thorax, setted to 0
+        output[30] = y_hat[0].item()  # x coord right arm
+        output[[31, 34]] = 100  # y coord for arms repeated twice, also constrained to 0
+        output[33] = y_hat[1].item()  # x coord left arm
 
-    # Isocenter indexes
-    index_X = [0, 3, 6, 9, 12, 15, 18, 21, 24, 27]
-    index_Y = [1, 4, 7, 10, 13, 16, 19, 22, 25, 28]
-    output[index_X] = find_x_coord(
-        ptv_masks[patient_idx]
-    )  # x coord repeated 8 times + 2 times for iso thorax
-    output[
-        index_Y
-    ] = 100  # y coord repeated 8 times + 2 times for iso thorax, setted to 0
-    output[30] = y_hat[0].item()  # x coord right arm
-    output[[31, 34]] = 100  # y coord for arms repeated twice, also constrained to 0
-    output[33] = y_hat[1].item()  # x coord left arm
+        for z in range(6):  # z coords
+            output[z * 3 * 2 + 2] = y_hat[z + 2].item()
+            output[z * 3 * 2 + 5] = y_hat[z + 2].item()
 
-    for z in range(6):  # z coords
-        output[z * 3 * 2 + 2] = y_hat[z + 2].item()
-        output[z * 3 * 2 + 5] = y_hat[z + 2].item()
+        # Begin jaw_X
+        for i in range(11):
+            output[36 + i] = y_hat[
+                8 + i
+            ].item()  # retrieve apertures of first 11 fields
 
-    # Begin jaw_X
-    for i in range(11):
-        output[36 + i] = y_hat[8 + i].item()  # retrieve apertures of first 11 fields
+        for i in range(3):
+            output[48 + i] = y_hat[
+                19 + i
+            ].item()  # add in groups of three avoiding repetitions
+            output[52 + i] = y_hat[22 + i].item()
+            output[56 + i] = y_hat[25 + i].item()
 
-    for i in range(3):
-        output[48 + i] = y_hat[
-            19 + i
-        ].item()  # add in groups of three avoiding repetitions
-        output[52 + i] = y_hat[22 + i].item()
-        output[56 + i] = y_hat[25 + i].item()
+        # Symmetric apertures
+        output[47] = -output[44]
+        output[51] = -output[48]
+        output[55] = -output[52]
 
-    # Symmetric apertures
-    output[47] = -output[44]
-    output[51] = -output[48]
-    output[55] = -output[52]
+        output[59] = y_hat[28].item()
 
-    output[59] = y_hat[28].item()
+        # Begin jaw_Y
+        for i in range(4):
+            if i < 2:
+                # Same apertures opposite signs
+                output[60 + 2 * i] = y_hat[i + 29].item()
+                output[61 + 2 * i] = -y_hat[i + 29].item()
 
-    # Begin jaw_Y
-    for i in range(4):
-        if i < 2:
-            # Same apertures opposite signs
-            output[60 + 2 * i] = y_hat[i + 29].item()
-            output[61 + 2 * i] = -y_hat[i + 29].item()
+                # 4 fields with equal (and opposite) apertures
+                output[64 + 2 * i] = y_hat[31].item()
+                output[65 + 2 * i] = -y_hat[31].item()
+                output[68 + 2 * i] = y_hat[32].item()  # index 35 == thorax iso
+                output[69 + 2 * i] = -y_hat[32].item()
 
-            # 4 fields with equal (and opposite) apertures
-            output[64 + 2 * i] = y_hat[31].item()
-            output[65 + 2 * i] = -y_hat[31].item()
-            output[68 + 2 * i] = y_hat[32].item()  # index 35 == thorax iso
-            output[69 + 2 * i] = -y_hat[32].item()
+                # 2 fields with equal (and opposite) apertures
+                output[72 + 2 * i] = y_hat[31].item()
+                output[73 + 2 * i] = -y_hat[31].item()
 
-            # 2 fields with equal (and opposite) apertures
-            output[72 + 2 * i] = y_hat[31].item()
-            output[73 + 2 * i] = -y_hat[31].item()
+                # Arms apertures with opposite sign
+                output[80 + 2 * i] = y_hat[37 + i].item()
+                output[81 + 2 * i] = -y_hat[37 + i].item()
 
-            # Arms apertures with opposite sign
-            output[80 + 2 * i] = y_hat[37 + i].item()
-            output[81 + 2 * i] = -y_hat[37 + i].item()
+            output[76 + i] = y_hat[33 + i].item()  # apertures for the head
+    if y_hat.shape[0] == 34:
+        # Isocenter indexes
+        index_X = [0, 3, 6, 9, 12, 15, 18, 21, 24, 27]
+        index_Y = [1, 4, 7, 10, 13, 16, 19, 22, 25, 28]
+        output[index_X] = find_x_coord(
+            ptv_masks[patient_idx]
+        )  # x coord repeated 8 times + 2 times for iso thorax
+        output[
+            index_Y
+        ] = 100  # y coord repeated 8 times + 2 times for iso thorax, setted to 100
+        output[30] = y_hat[0].item()  # x coord right arm
+        output[
+            [31, 34]
+        ] = 100  # y coord for arms repeated twice, also constrained to 100
+        output[33] = y_hat[1].item()  # x coord left arm
 
-        output[76 + i] = y_hat[33 + i].item()  # apertures for the head
+        for z in range(2):  # first two z coords
+            output[z * 3 * 2 + 2] = y_hat[z + 2].item()
+            output[z * 3 * 2 + 5] = y_hat[z + 2].item()
+        output[20] = 0  # we skip the third ISO
+        output[23] = 0  # we skip the third ISO
+        for z in range(3):  # last three z coords we skip the third ISO
+            output[(z + 3) * 3 * 2 + 2] = y_hat[z + 4].item()
+            output[(z + 3) * 3 * 2 + 5] = y_hat[z + 4].item()
+
+        # Begin jaw_X
+        for i in range(8):
+            output[36 + i] = y_hat[
+                7 + i
+            ].item()  # retrieve apertures of first 11 fields
+        for i in range(3):
+            output[44 + i] = 0
+        for i in range(3):
+            output[48 + i] = y_hat[
+                15 + i
+            ].item()  # add in groups of three avoiding repetitions
+            output[52 + i] = y_hat[18 + i].item()
+            output[56 + i] = y_hat[21 + i].item()
+
+        # Symmetric apertures
+        output[47] = -output[44]
+        output[51] = -output[48]
+        output[55] = -output[52]
+
+        output[59] = y_hat[24].item()
+
+        # Begin jaw_Y
+        for i in range(4):
+            if i < 2:
+                # Same apertures opposite signs #LEGS
+                output[60 + 2 * i] = y_hat[i + 25].item()
+                output[61 + 2 * i] = -y_hat[i + 25].item()
+
+                # 4 fields with equal (and opposite) apertures
+                output[64 + 2 * i] = y_hat[26].item()
+                output[65 + 2 * i] = -y_hat[26].item()
+                output[68 + 2 * i] = 0  # index 35 == thorax iso
+                output[69 + 2 * i] = 0
+
+                # 2 fields with equal (and opposite) apertures
+                output[72 + 2 * i] = y_hat[26].item()
+                output[73 + 2 * i] = -y_hat[26].item()
+
+                # Arms apertures with opposite sign
+                output[80 + 2 * i] = y_hat[32 + i].item()
+                output[81 + 2 * i] = -y_hat[32 + i].item()
+
+            output[76 + i] = y_hat[28 + i].item()  # apertures for the head
 
     return torch.Tensor(output)
 
