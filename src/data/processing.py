@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import imgaug.augmenters as iaa
 from imgaug.augmentables import Keypoint, KeypointsOnImage
 from src.utils.field_geometry_transf import get_zero_row_idx
@@ -537,18 +538,35 @@ def load_masks() -> list[np.ndarray]:
 
 
 if __name__ == "__main__":
+    patient_info = pd.read_csv(r"data\patient_info.csv").sort_values(by="PlanDate")
+    iso_on_arms = patient_info["IsocenterOnArms"].to_numpy()
     mask_imgs = load_masks()
     isocenters_pix = np.load(r"data\raw\isocenters_pix.npy")
     jaws_X_pix = np.load(r"data\raw\jaws_X_pix.npy")
     jaws_Y_pix = np.load(r"data\raw\jaws_Y_pix.npy")
     coll_angles = np.load(r"data\raw\angles.npy")
-
-    processing = Processing(
-        mask_imgs,
-        isocenters_pix,
-        jaws_X_pix,
-        jaws_Y_pix,
-        coll_angles,
-    )
+    model_arms = True
+    if model_arms:
+        arms_mask = [mask for mask, bool_val in zip(mask_imgs, iso_on_arms) if bool_val]
+        iso_on_arms = iso_on_arms.astype(bool)
+        arms_iso = isocenters_pix[iso_on_arms]
+        arms_j_X = jaws_X_pix[iso_on_arms]
+        arms_j_Y = jaws_Y_pix[iso_on_arms]
+        arms_coll_ang = coll_angles[iso_on_arms]
+        processing = Processing(
+            arms_mask,
+            arms_iso,
+            arms_j_X,
+            arms_j_Y,
+            arms_coll_ang,
+        )
+    else:
+        processing = Processing(
+            mask_imgs,
+            isocenters_pix,
+            jaws_X_pix,
+            jaws_Y_pix,
+            coll_angles,
+        )
 
     processing.trasform().save_data()
