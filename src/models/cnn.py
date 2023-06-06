@@ -6,7 +6,12 @@ import torch
 class CNN(nn.Module):
     """Simple CNN for model testing"""
 
-    def __init__(self, filters: int, activation=nn.ReLU()):
+    def __init__(
+        self,
+        filters: int,
+        output: int,
+        activation=nn.ReLU(),
+    ):
         super().__init__()
         self.simple_cnn = nn.Sequential(
             nn.Conv2d(
@@ -17,7 +22,19 @@ class CNN(nn.Module):
             activation,
             nn.Conv2d(
                 filters,
-                filters,
+                filters * 2,
+                8,
+            ),
+            activation,
+            nn.Conv2d(
+                filters * 2,
+                filters * 4,
+                8,
+            ),
+            activation,
+            nn.Conv2d(
+                filters * 4,
+                filters * 8,
                 8,
             ),
             activation,
@@ -26,11 +43,11 @@ class CNN(nn.Module):
 
         self.regression_head = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(filters * 249 * 249, 39),
+            nn.Linear(filters * 8 * 242 * 242, output),
         )
         self.classification_head = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(filters * 249 * 249, 1),
+            nn.Linear(filters * 8 * 242 * 242, 1),
         )
 
     def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
