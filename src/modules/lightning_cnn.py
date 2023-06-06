@@ -23,6 +23,7 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
         activation=nn.ReLU(),
         focus_on=[0, 1],
         filters=16,
+        output=39,
     ):
         """Initialize the LitCNN module
 
@@ -34,7 +35,11 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
         self.example_input_array = torch.Tensor(
             32, 3, 512, 512
         )  # display the intermediate input and output sizes of layers when trainer.fit() is called
-        self.cnn = CNN(filters, activation)
+        self.cnn = CNN(
+            filters,
+            output,
+            activation,
+        )
         self.accuracy = BinaryAccuracy()
         self.learning_rate = learning_rate
         self.train_mse_weight = mse_loss_weight
