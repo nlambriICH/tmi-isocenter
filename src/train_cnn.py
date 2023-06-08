@@ -4,14 +4,32 @@ from torch.utils.data import TensorDataset, DataLoader
 import lightning.pytorch as pl
 from lightning.pytorch.callbacks import ModelSummary, LearningRateMonitor
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
+from pytorch_lightning.loggers import TensorBoardLogger
+
+from src.data.dataset_arms import Dataset_arms
 from src.data.dataset import Dataset
+from src.modules.arms_cnn import ArmCNN
 from src.modules.lightning_cnn import LitCNN
+from src.utils.visualization_cnn import model_arms
 
 
 if __name__ == "__main__":
-    dataset = Dataset()
+    model_arms = model_arms
+    if model_arms:
+        dataset = Dataset_arms()
+        lightning_cnn = ArmCNN()
+        name = "arms_model"
+    else:
+        dataset = Dataset()
+        lightning_cnn = LitCNN()
+        name = "whole_body_model"
     train_index, val_idx, test_index = dataset.train_val_test_split(test_set="balanced")
     masks_aug, y_reg, y_cls = dataset.get_data_Xy()
+    logger = TensorBoardLogger(
+        "lightning_logs",
+        name=name,
+        log_graph=True,
+    )
 
     (
         masks_train,
@@ -43,7 +61,7 @@ if __name__ == "__main__":
             ),
         )
     )
-
+    test_len = len(test_index)
     train_loader = DataLoader(
         TensorDataset(
             masks_train,
@@ -64,14 +82,18 @@ if __name__ == "__main__":
             y_reg_test,
             y_cls_test,
             test_idx,
-            masks_train[0:11],
-            train_index[0:11],
+            masks_train[
+                0:test_len
+            ],  # it switches if the dataset changes: [0:11] or [0:3]
+            train_index[
+                0:test_len
+            ],  # it switches if the dataset changes: [0:11] or [0:3]
         ),
         num_workers=1,
     )
 
-    lightning_cnn = LitCNN()
     trainer = pl.Trainer(
+        logger=logger,  # pyright: ignore[reportGeneralTypeIssues]
         callbacks=[  # pyright: ignore[reportGeneralTypeIssues]
             EarlyStopping(monitor="val_mse_loss", mode="min", patience=7),
             ModelSummary(
@@ -79,7 +101,7 @@ if __name__ == "__main__":
             ),  # print the weights summary of the model when trainer.fit() is called
             LearningRateMonitor(logging_interval="epoch"),
         ],
-        max_epochs=40,
+        max_epochs=100,
         log_every_n_steps=1,
     )
     trainer.fit(
