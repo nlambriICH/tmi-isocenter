@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from src.data.processing import Processing
 from scipy import ndimage
+from src.data.processing import model_arms
 
 with np.load(r"data\raw\ptv_masks2D.npz") as npz_masks2d:
     ptv_masks = list(npz_masks2d.values())
@@ -17,7 +18,7 @@ jaws_X_pix = np.load(r"data\raw\jaws_X_pix.npy")
 jaws_Y_pix = np.load(r"data\raw\jaws_Y_pix.npy")
 coll_angles = np.load(r"data\raw\angles.npy")
 df_patient_info = pd.read_csv(r"data\patient_info.csv")
-model_arms = True
+model_arms = model_arms
 if model_arms:
     # Here I'm working on the model with Iso on arms
     iso_on_arms = df_patient_info["IsocenterOnArms"].to_numpy()
@@ -122,17 +123,22 @@ def build_output(y_hat: torch.Tensor, patient_idx: int) -> torch.Tensor:
             output[(z + 3) * 3 * 2 + 5] = y_hat[z + 4].item()
 
         # Begin jaw_X
+        # 4 Legs + 4 Pelvi
         for i in range(8):
             output[36 + i] = y_hat[
                 7 + i
             ].item()  # retrieve apertures of first 11 fields
+        # 3 for third iso = null + one symmetric (thus 0 )
         for i in range(3):
             output[44 + i] = 0
+        # 3 for chest iso = null + one symmetric (again 0 so)
         for i in range(3):
             output[48 + i] = y_hat[
                 15 + i
             ].item()  # add in groups of three avoiding repetitions
+            # Head
             output[52 + i] = y_hat[18 + i].item()
+            # Arms
             output[56 + i] = y_hat[21 + i].item()
 
         # Symmetric apertures
@@ -384,9 +390,7 @@ def plot_img(
     # Retrieve information of the original shape
     processing_output.original_sizes = [processing_raw.original_sizes[patient_idx]]
 
-    processing_output.inverse_scale()
-    processing_output.inverse_rotate_90()
-    processing_output.inverse_resize()
+    processing_output.inverse_trasform()
     processing_raw.inverse_rotate_90()
     processing_raw.inverse_resize()
 
