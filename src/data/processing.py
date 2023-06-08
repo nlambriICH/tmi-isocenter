@@ -6,6 +6,9 @@ from src.utils.field_geometry_transf import get_zero_row_idx
 import os
 
 
+model_arms = False
+
+
 class Processing:
     """Processing class to prepare the data and for post-training operations"""
 
@@ -133,7 +136,7 @@ class Processing:
         isos_kps_img_rot3D = np.zeros(
             shape=(self.num_patients, self.iso_per_patient, 3)
         )
-        rot = iaa.Rot90(k=1, keep_size=False)
+        rot = iaa.Rot90(k=-1, keep_size=False)
 
         for i, (mask2d, iso_pix) in enumerate(zip(self.masks, self.isocenters_pix)):
             iso_kps_img = KeypointsOnImage(
@@ -244,7 +247,7 @@ class Processing:
         isos_kps_img_rot3D = np.zeros(
             shape=(self.num_patients, self.iso_per_patient, 3)
         )
-        rot = iaa.Rot90(k=-1, keep_size=False)
+        rot = iaa.Rot90(k=1, keep_size=False)
 
         for i, (mask2d, iso_pix) in enumerate(zip(self.masks, self.isocenters_pix)):
             # Swap columns to original dicom coordinate system
@@ -321,7 +324,7 @@ class Processing:
             aug = iaa.Sequential(
                 [
                     iaa.Resize(size={"height": 512, "width": width_resize}),
-                    iaa.Rot90(k=1, keep_size=False),
+                    iaa.Rot90(k=-1, keep_size=False),
                 ]
             )
             # Keypoint x: column-wise == dicom-z, keypoint y: row-wise == dicom-x
@@ -377,7 +380,7 @@ class Processing:
         ):
             aug = iaa.Sequential(
                 [
-                    iaa.Rot90(k=-1, keep_size=False),
+                    iaa.Rot90(k=1, keep_size=False),
                     iaa.Resize(size={"height": 512, "width": width_resize}),
                 ]
             )
@@ -538,14 +541,14 @@ def load_masks() -> list[np.ndarray]:
 
 
 if __name__ == "__main__":
-    patient_info = pd.read_csv(r"data\patient_info.csv").sort_values(by="PlanDate")
+    patient_info = pd.read_csv(r"data\patient_info.csv")
     iso_on_arms = patient_info["IsocenterOnArms"].to_numpy()
     mask_imgs = load_masks()
     isocenters_pix = np.load(r"data\raw\isocenters_pix.npy")
     jaws_X_pix = np.load(r"data\raw\jaws_X_pix.npy")
     jaws_Y_pix = np.load(r"data\raw\jaws_Y_pix.npy")
     coll_angles = np.load(r"data\raw\angles.npy")
-    model_arms = True
+
     if model_arms:
         arms_mask = [mask for mask, bool_val in zip(mask_imgs, iso_on_arms) if bool_val]
         iso_on_arms = iso_on_arms.astype(bool)
