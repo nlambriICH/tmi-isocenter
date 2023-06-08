@@ -34,9 +34,9 @@ class Dataset:
         self.angles = np.load(r"data\interim\angles.npy")  # shape=(N, 12)
         self.angle_class = np.where(self.angles[:, 0] == 90, 0.0, 1.0)  # shape=(N,)
 
-        self.df_patient_info = pd.read_csv(r"data\patient_info.csv").sort_values(
-            by="PlanDate"
-        )
+        self.df_patient_info = pd.read_csv(
+            r"data\patient_info.csv"
+        )  # .sort_values(            by="PlanDate"        )
         # Creating the class interaction between arms and angle
         self.iso_on_arms = self.df_patient_info["IsocenterOnArms"].to_numpy()
 
@@ -71,8 +71,8 @@ class Dataset:
             The resulting normalized masks are stored in a new numpy array `norm_ptv` which is returned.
         """
         norm_ptv = np.zeros_like(self.masks2d)
-        for i, mask in enumerate(self.masks2d):
-            mask = mask[0]
+        for i, mask2 in enumerate(self.masks2d):
+            mask = mask2[0]
             non_zero_values = mask[mask != 0]
             min_value = np.min(non_zero_values) if background == -1 else np.min(mask)
             max_value = np.max(non_zero_values) if background == -1 else np.max(mask)
@@ -82,7 +82,9 @@ class Dataset:
                 if background == -1
                 else (mask - min_value) / difference
             )
-            norm_ptv[i] = normalized
+            norm_ptv[i][0] = normalized
+            norm_ptv[i][1] = mask2[1]
+            norm_ptv[i][2] = mask2[2]
         return norm_ptv
 
     def train_val_test_split(
