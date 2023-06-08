@@ -18,11 +18,11 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
         self,
         learning_rate=1e-5,
         mse_loss_weight=5.0,
-        bcelogits_loss_weight=1.0,
+        bcelogits_loss_weight=0.001,
         weight=1,
         activation=nn.ReLU(),
         focus_on=[0, 1],
-        filters=16,
+        filters=4,
         output=39,
     ):
         """Initialize the LitCNN module
