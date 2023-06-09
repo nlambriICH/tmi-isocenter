@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from src.data.processing import Processing
 from scipy import ndimage
-from src.data.processing import model_arms
+from src.data.processing import model
 
 with np.load(r"data\raw\ptv_masks2D.npz") as npz_masks2d:
     ptv_masks = list(npz_masks2d.values())
@@ -18,8 +18,7 @@ jaws_X_pix = np.load(r"data\raw\jaws_X_pix.npy")
 jaws_Y_pix = np.load(r"data\raw\jaws_Y_pix.npy")
 coll_angles = np.load(r"data\raw\angles.npy")
 df_patient_info = pd.read_csv(r"data\patient_info.csv")
-model_arms = model_arms
-if model_arms:
+if model == "arms":
     # Here I'm working on the model with Iso on arms
     iso_on_arms = df_patient_info["IsocenterOnArms"].to_numpy()
     bool_arms = iso_on_arms.astype(bool)
@@ -30,6 +29,16 @@ if model_arms:
     jaws_Y_pix = jaws_Y_pix[bool_arms]
     coll_angles = coll_angles[bool_arms]
     # Ends Iso on arms part
+elif model == "body":
+    # Here I'm working on the model with Iso on arms
+    iso_on_arms = df_patient_info["IsocenterOnArms"].to_numpy()
+    bool_arms = ~iso_on_arms.astype(bool)
+    df_patient_info = df_patient_info[bool_arms].reset_index()
+    ptvs = [mask for mask, bool_val in zip(ptvs, bool_arms) if bool_val]
+    isocenters_pix = isocenters_pix[bool_arms]
+    jaws_X_pix = jaws_X_pix[bool_arms]
+    jaws_Y_pix = jaws_Y_pix[bool_arms]
+    coll_angles = coll_angles[bool_arms]
 
 pix_spacing_col_idx = df_patient_info.columns.get_loc(key="PixelSpacing")
 slice_tickness_col_idx = df_patient_info.columns.get_loc(key="SliceThickness")
@@ -170,6 +179,73 @@ def build_output(y_hat: torch.Tensor, patient_idx: int) -> torch.Tensor:
                 output[81 + 2 * i] = -y_hat[32 + i].item()
 
             output[76 + i] = y_hat[28 + i].item()  # apertures for the head
+    if y_hat.shape[0] == 30:
+        # Isocenter indexes
+        index_X = [0, 3, 6, 9, 12, 15, 18, 21, 24, 27]
+        index_Y = [1, 4, 7, 10, 13, 16, 19, 22, 25, 28]
+        output[index_X] = find_x_coord(
+            ptv_masks[patient_idx]
+        )  # x coord repeated 8 times + 2 times for iso thorax
+        output[
+            index_Y
+        ] = 100  # y coord repeated 8 times + 2 times for iso thorax, setted to 0
+        output[30] = 0  # x coord right arm
+        output[[31, 34]] = 100  # y coord for arms repeated twice, also constrained to 0
+        output[33] = 0  # x coord left arm
+
+        for z in range(6):  # z coords
+            output[z * 3 * 2 + 2] = y_hat[z].item()
+            output[z * 3 * 2 + 5] = y_hat[z].item()
+
+        # Begin jaw_X
+        for i in range(11):
+            output[36 + i] = y_hat[
+                6 + i
+            ].item()  # retrieve apertures of first 11 fields
+
+        for i in range(3):
+            # chest
+            output[48 + i] = y_hat[
+                17 + i
+            ].item()  # add in groups of three avoiding repetitions
+            # head
+            output[52 + i] = y_hat[20 + i].item()
+            # arms
+            output[56 + i] = 0
+
+        # Symmetric apertures
+        # third iso
+        output[47] = -output[44]
+        # chest
+        output[51] = -output[48]
+        # head
+        output[55] = -output[52]
+        # arms
+        output[59] = 0
+
+        # Begin jaw_Y
+        for i in range(4):
+            if i < 2:
+                # Same apertures opposite signs LEGS
+                output[60 + 2 * i] = y_hat[i + 23].item()
+                output[61 + 2 * i] = -y_hat[i + 23].item()
+
+                # 4 fields with equal (and opposite) apertures
+                # Pelvi
+                output[64 + 2 * i] = y_hat[25].item()
+                output[65 + 2 * i] = -y_hat[25].item()
+                # Third iso
+                output[68 + 2 * i] = y_hat[25].item()
+                output[69 + 2 * i] = -y_hat[25].item()
+                # Chest
+                output[72 + 2 * i] = y_hat[25].item()
+                output[73 + 2 * i] = -y_hat[25].item()
+
+                # Arms apertures with opposite sign
+                output[80 + 2 * i] = 0
+                output[81 + 2 * i] = 0
+
+            output[76 + i] = y_hat[26 + i].item()  # apertures for the head
 
     return torch.Tensor(output)
 

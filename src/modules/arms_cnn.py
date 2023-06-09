@@ -5,8 +5,6 @@ import torch.nn.functional as F
 import torch
 from torch import nn
 from torchmetrics.classification import BinaryAccuracy
-from torch.optim.lr_scheduler import ReduceLROnPlateau
-from torch.optim import Adam
 from src.models.cnn import CNN
 from src.utils.visualization_cnn import plot_img
 
@@ -40,7 +38,7 @@ class ArmCNN(LitCNN):  # pylint: disable=too-many-ancestors
         self.learning_rate = learning_rate
         self.train_mse_weight = mse_loss_weight
         self.bcelogits_loss_weight = bcelogits_loss_weight
-        self.weights = torch.ones(34)
+        self.weights = torch.ones(output)
         self.weights[focus_on] = weight
         self.save_hyperparameters()
         self.filters = filters

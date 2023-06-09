@@ -5,8 +5,11 @@ from imgaug.augmentables import Keypoint, KeypointsOnImage
 from src.utils.field_geometry_transf import get_zero_row_idx
 import os
 
-
-model_arms = False
+"""
+Choose between three models:
+"body" "arms" "all"
+"""
+model = "arms"
 
 
 class Processing:
@@ -549,9 +552,23 @@ if __name__ == "__main__":
     jaws_Y_pix = np.load(r"data\raw\jaws_Y_pix.npy")
     coll_angles = np.load(r"data\raw\angles.npy")
 
-    if model_arms:
+    if model == "arms":
         arms_mask = [mask for mask, bool_val in zip(mask_imgs, iso_on_arms) if bool_val]
         iso_on_arms = iso_on_arms.astype(bool)
+        arms_iso = isocenters_pix[iso_on_arms]
+        arms_j_X = jaws_X_pix[iso_on_arms]
+        arms_j_Y = jaws_Y_pix[iso_on_arms]
+        arms_coll_ang = coll_angles[iso_on_arms]
+        processing = Processing(
+            arms_mask,
+            arms_iso,
+            arms_j_X,
+            arms_j_Y,
+            arms_coll_ang,
+        )
+    elif model == "body":
+        iso_on_arms = ~iso_on_arms.astype(bool)
+        arms_mask = [mask for mask, bool_val in zip(mask_imgs, iso_on_arms) if bool_val]
         arms_iso = isocenters_pix[iso_on_arms]
         arms_j_X = jaws_X_pix[iso_on_arms]
         arms_j_Y = jaws_Y_pix[iso_on_arms]

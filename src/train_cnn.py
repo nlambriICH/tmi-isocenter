@@ -5,24 +5,31 @@ import lightning.pytorch as pl
 from lightning.pytorch.callbacks import ModelSummary, LearningRateMonitor
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.loggers import TensorBoardLogger
-
-from src.data.dataset_arms import Dataset_arms
-from src.data.dataset import Dataset
-from src.modules.arms_cnn import ArmCNN
-from src.modules.lightning_cnn import LitCNN
-from src.utils.visualization_cnn import model_arms
+from src.utils.visualization_cnn import model
 
 
 if __name__ == "__main__":
-    model_arms = model_arms
-    if model_arms:
+    if model == "arms":
+        from src.data.dataset_arms import Dataset_arms
+        from src.modules.arms_cnn import ArmCNN
+
         dataset = Dataset_arms()
         lightning_cnn = ArmCNN()
         name = "arms_model"
+    elif model == "body":
+        from src.data.dataset_body import Dataset_body
+        from src.modules.body_cnn import BodyCNN
+
+        dataset = Dataset_body()
+        lightning_cnn = BodyCNN()
+        name = "body_model"
     else:
+        from src.data.dataset import Dataset
+        from src.modules.lightning_cnn import LitCNN
+
         dataset = Dataset()
         lightning_cnn = LitCNN()
-        name = "whole_body_model"
+        name = "whole_model"
     train_index, val_idx, test_index = dataset.train_val_test_split(test_set="balanced")
     masks_aug, y_reg, y_cls = dataset.get_data_Xy()
     logger = TensorBoardLogger(

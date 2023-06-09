@@ -1,29 +1,27 @@
 """Lightning module for CNN training"""
 import os
-import lightning.pytorch as pl
+from src.modules.lightning_cnn import LitCNN
 import torch.nn.functional as F
 import torch
 from torch import nn
 from torchmetrics.classification import BinaryAccuracy
-from torch.optim.lr_scheduler import ReduceLROnPlateau
-from torch.optim import Adam
 from src.models.cnn import CNN
 from src.utils.visualization_cnn import plot_img
 
 
-class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
+class BodyCNN(LitCNN):  # pylint: disable=too-many-ancestors
     """Lightning module for CNN training"""
 
     def __init__(
         self,
         learning_rate=1e-5,
         mse_loss_weight=5.0,
-        bcelogits_loss_weight=0.00000001,
-        weight=2,
+        bcelogits_loss_weight=0.0000001,
+        weight=1,
         activation=nn.ReLU(),
         focus_on=[0, 1],
         filters=4,
-        output=39,
+        output=30,
     ):
         """Initialize the LitCNN module
 
@@ -35,11 +33,7 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
         self.example_input_array = torch.Tensor(
             32, 3, 512, 512
         )  # display the intermediate input and output sizes of layers when trainer.fit() is called
-        self.cnn = CNN(
-            filters,
-            output,
-            activation,
-        )
+        self.cnn = CNN(filters, output, activation)
         self.accuracy = BinaryAccuracy()
         self.learning_rate = learning_rate
         self.train_mse_weight = mse_loss_weight
@@ -48,23 +42,6 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
         self.weights[focus_on] = weight
         self.save_hyperparameters()
         self.filters = filters
-
-    def weighted_mse_loss(
-        self,
-        inputs: torch.Tensor,
-        targets: torch.Tensor,
-    ) -> torch.Tensor:
-        """
-        Calculates the weighted mean squared error (MSE) loss between the inputs and targets.
-
-        Args:
-            inputs (torch.Tensor): The predicted inputs tensor.
-            targets (torch.Tensor): The target tensor with the ground truth values.
-
-        Returns:
-            torch.Tensor: The weighted MSE loss.
-        """
-        return (self.weights * F.mse_loss(inputs, targets, reduction="none")).mean()
 
     def training_step(  # pylint: disable=arguments-differ
         self, batch: list[torch.Tensor], batch_idx: int
@@ -78,6 +55,14 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
         Returns:
             torch.Tensor: loss value
         """
+        if self.current_epoch == 1:
+            self.logger.log_graph(self)  # pyright: ignore[reportOptionalMemberAccess]
+
+        for name, param in self.named_parameters():
+            self.logger.experiment.add_histogram(  # pyright: ignore[reportOptionalMemberAccess , reportGeneralTypeIssues]
+                name, param, global_step=self.global_step
+            )
+
         x, y_reg, y_cls = batch
         # x = x.unsqueeze_(1)  # shape=(N_batch, 1, 512, 512)
         y_reg = y_reg.view(y_reg.size(0), -1)  # shape=(N_batch, N_out)
@@ -160,17 +145,3 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
             self.logger.log_dir,  # pyright: ignore[reportGeneralTypeIssues,reportOptionalMemberAccess]
             mse=test_mse_loss,
         )
-
-    def forward(  # pylint: disable=arguments-differ
-        self, x: torch.Tensor
-    ) -> torch.Tensor:
-        return self.cnn(x)
-
-    def configure_optimizers(self) -> dict:
-        optimizer = Adam(self.parameters(), lr=self.learning_rate)
-        scheduler = ReduceLROnPlateau(optimizer, patience=3)
-        return {
-            "optimizer": optimizer,
-            "lr_scheduler": scheduler,
-            "monitor": "train_loss",
-        }

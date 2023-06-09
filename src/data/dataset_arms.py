@@ -1,9 +1,7 @@
 """Dataset utility functions"""
 from typing import Literal
 import numpy as np
-import pandas as pd
 from sklearn.model_selection import train_test_split
-import torch
 from src.data.dataset import Dataset
 
 
