@@ -137,8 +137,7 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
             x_train,
             train_index,
         ) = batch
-        # need additional (batch) dimension because Flatten layer has start_dim=1
-        # x = x.unsqueeze_(0)  # shape=(1, 1, 512, 512)
+
         y_reg = y_reg.view(1, -1)  # shape=(1, N_out)
         y_cls = y_cls.view(1, -1)  # shape=(1, N_out)
         y_reg_hat, y_cls_hat = self.cnn(x)
@@ -146,18 +145,26 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
         self.accuracy(torch.sigmoid(y_cls_hat), y_cls)
         metrics = {"test_mse_loss": test_mse_loss, "test_accuracy": self.accuracy}
         # x_train = x_train.unsqueeze_(0)
-        y_train_reg_hat = self.cnn(x_train)
+        y_train_reg_hat, y_train_cls_hat = self.cnn(x_train)
         self.log_dict(metrics)
         # check overfitting
         path = os.path.join(
             self.logger.log_dir,  # pyright: ignore[reportGeneralTypeIssues, reportOptionalMemberAccess]
             "train_img",  # pyright: ignore[reportGeneralTypeIssues]
         )
-        plot_img(int(train_index.item()), y_train_reg_hat[0][0], path, single_fig=True)
+        # Two plots, first one for the train and the second for the test images
         plot_img(
-            int(test_idx.item()),
-            y_reg_hat[0],
-            self.logger.log_dir,  # pyright: ignore[reportGeneralTypeIssues,reportOptionalMemberAccess]
+            patient_idx=int(train_index.item()),
+            output=y_train_reg_hat[0],
+            path=path,
+            coll_angle_hat=y_cls_hat,
+            single_fig=True,
+        )
+        plot_img(
+            patient_idx=int(test_idx.item()),
+            output=y_reg_hat[0],
+            path=self.logger.log_dir,  # pyright: ignore[reportGeneralTypeIssues,reportOptionalMemberAccess]
+            coll_angle_hat=y_train_cls_hat,
             mse=test_mse_loss,
         )
 

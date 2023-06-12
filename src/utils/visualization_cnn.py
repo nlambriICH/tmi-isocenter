@@ -407,6 +407,9 @@ def plot_img(
     patient_idx: int,
     output: torch.Tensor,
     path: str,
+    coll_angle_hat: torch.Tensor = torch.ones(
+        1
+    ),  # Default 90, if isn't important visualize the angle.
     mse: torch.Tensor = torch.tensor(0),
     single_fig: bool = False,
 ) -> None:
@@ -454,13 +457,20 @@ def plot_img(
     isocenters_hat = isocenters_hat[np.newaxis]
     jaws_X_pix_hat = jaws_X_pix_hat[np.newaxis]
     jaws_Y_pix_hat = jaws_Y_pix_hat[np.newaxis]
+    angles = 90 * np.ones(12)
+    if round(torch.sigmoid(coll_angle_hat).item()) == 1:
+        angles[0] = 355
+        angles[1] = 5
 
+    if model != "body":
+        angles[10] = 355
+        angles[11] = 5
     processing_output = Processing(
         [processing_raw.masks[patient_idx]],  # resized mask
         isocenters_hat,
         jaws_X_pix_hat,
         jaws_Y_pix_hat,
-        coll_angles[patient_idx],
+        angles,
     )
 
     # Retrieve information of the original shape

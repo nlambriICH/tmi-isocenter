@@ -16,7 +16,7 @@ class BodyCNN(LitCNN):  # pylint: disable=too-many-ancestors
         self,
         learning_rate=1e-5,
         mse_loss_weight=5.0,
-        bcelogits_loss_weight=0.0000001,
+        bcelogits_loss_weight=0.00000001,
         weight=1,
         activation=nn.ReLU(),
         focus_on=[0, 1],
@@ -104,44 +104,3 @@ class BodyCNN(LitCNN):  # pylint: disable=too-many-ancestors
         self.accuracy(torch.sigmoid(y_cls_hat), y_cls)
         metrics = {"val_mse_loss": val_mse_loss, "val_accuracy": self.accuracy}
         self.log_dict(metrics)
-
-    def test_step(  # pylint: disable=arguments-differ
-        self, batch: list[torch.Tensor], batch_idx: int
-    ) -> None:
-        """Test loop
-
-        Args:
-            batch (list[torch.Tensor]): input batch
-            batch_idx (int): batch index
-        """
-        (
-            x,
-            y_reg,
-            y_cls,
-            test_idx,
-            x_train,
-            train_index,
-        ) = batch
-        # need additional (batch) dimension because Flatten layer has start_dim=1
-        # x = x.unsqueeze_(0)  # shape=(1, 1, 512, 512)
-        y_reg = y_reg.view(1, -1)  # shape=(1, N_out)
-        y_cls = y_cls.view(1, -1)  # shape=(1, N_out)
-        y_reg_hat, y_cls_hat = self.cnn(x)
-        test_mse_loss = self.weighted_mse_loss(y_reg_hat, y_reg)
-        self.accuracy(torch.sigmoid(y_cls_hat), y_cls)
-        metrics = {"test_mse_loss": test_mse_loss, "test_accuracy": self.accuracy}
-        # x_train = x_train.unsqueeze_(0)
-        y_train_reg_hat = self.cnn(x_train)
-        self.log_dict(metrics)
-        # check overfitting
-        path = os.path.join(
-            self.logger.log_dir,  # pyright: ignore[reportGeneralTypeIssues, reportOptionalMemberAccess]
-            "train_img",  # pyright: ignore[reportGeneralTypeIssues]
-        )
-        plot_img(int(train_index.item()), y_train_reg_hat[0][0], path, single_fig=True)
-        plot_img(
-            int(test_idx.item()),
-            y_reg_hat[0],
-            self.logger.log_dir,  # pyright: ignore[reportGeneralTypeIssues,reportOptionalMemberAccess]
-            mse=test_mse_loss,
-        )
