@@ -308,6 +308,10 @@ def add_rectangle_patch(
     Returns:
         None
     """
+    if color == "r":
+        linestyle = "-"
+    else:
+        linestyle = "--"
     ax.add_patch(
         mpatches.Rectangle(
             anchor,
@@ -315,7 +319,8 @@ def add_rectangle_patch(
             height,
             angle=angle,
             rotation_point=rotation_point,
-            linewidth=1,
+            linestyle=linestyle,
+            linewidth=0.7,
             edgecolor=color,
             facecolor="none",
         )
@@ -356,6 +361,7 @@ def plot_fields(
         ValueError: If `unit_measure` is not "pix" or "mm".
     """
     aspect_ratio = slice_thickness / pix_spacing
+    color_flag = True
     for i, (iso, X, Y, angle) in enumerate(
         zip(
             iso_pixel,
@@ -392,6 +398,10 @@ def plot_fields(
             offset_row /= aspect_ratio
             width *= aspect_ratio
             height /= aspect_ratio
+        if color_flag:
+            color = "r"
+        else:
+            color = "b"
         add_rectangle_patch(
             ax,
             (iso_pixel_col + offset_col, iso_pixel_row - offset_row),
@@ -401,6 +411,7 @@ def plot_fields(
             angle,
             color,
         )
+        color_flag = not color_flag
 
 
 def plot_img(
@@ -535,7 +546,7 @@ def single_figure_plot(
         processing_output.isocenters_pix[0, :, 2],
         processing_output.isocenters_pix[0, :, 0],
         color="red",
-        s=10,
+        s=7,
     )
     plot_fields(
         plt.gca(),
@@ -552,7 +563,7 @@ def single_figure_plot(
         processing_raw.isocenters_pix[patient_idx, :, 2],
         processing_raw.isocenters_pix[patient_idx, :, 0],
         color="blue",
-        s=10,
+        s=7,
     )
     plot_fields(
         plt.gca(),
@@ -613,7 +624,7 @@ def separate_plots(
         processing_output.isocenters_pix[0, :, 2],
         processing_output.isocenters_pix[0, :, 0],
         color="red",
-        s=10,
+        s=7,
     )
     plot_fields(
         plt.gca(),
@@ -639,7 +650,7 @@ def separate_plots(
         processing_raw.isocenters_pix[patient_idx, :, 2],
         processing_raw.isocenters_pix[patient_idx, :, 0],
         color="blue",
-        s=10,
+        s=7,
     )
     plot_fields(
         plt.gca(),
