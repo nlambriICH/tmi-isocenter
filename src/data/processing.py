@@ -544,8 +544,6 @@ def load_masks() -> list[np.ndarray]:
 
 
 if __name__ == "__main__":
-    patient_info = pd.read_csv(r"data\patient_info.csv")
-    iso_on_arms = patient_info["IsocenterOnArms"].to_numpy()
     mask_imgs = load_masks()
     isocenters_pix = np.load(r"data\raw\isocenters_pix.npy")
     jaws_X_pix = np.load(r"data\raw\jaws_X_pix.npy")
@@ -553,40 +551,20 @@ if __name__ == "__main__":
     coll_angles = np.load(r"data\raw\angles.npy")
 
     if model == "arms":
-        arms_mask = [mask for mask, bool_val in zip(mask_imgs, iso_on_arms) if bool_val]
-        iso_on_arms = iso_on_arms.astype(bool)
-        arms_iso = isocenters_pix[iso_on_arms]
-        arms_j_X = jaws_X_pix[iso_on_arms]
-        arms_j_Y = jaws_Y_pix[iso_on_arms]
-        arms_coll_ang = coll_angles[iso_on_arms]
-        processing = Processing(
-            arms_mask,
-            arms_iso,
-            arms_j_X,
-            arms_j_Y,
-            arms_coll_ang,
-        )
+        patient_info = pd.read_csv(r"data\patient_info.csv")
+        iso_index = patient_info.IsocenterOnArms.to_numpy(dtype=bool)
     elif model == "body":
-        iso_on_arms = ~iso_on_arms.astype(bool)
-        arms_mask = [mask for mask, bool_val in zip(mask_imgs, iso_on_arms) if bool_val]
-        arms_iso = isocenters_pix[iso_on_arms]
-        arms_j_X = jaws_X_pix[iso_on_arms]
-        arms_j_Y = jaws_Y_pix[iso_on_arms]
-        arms_coll_ang = coll_angles[iso_on_arms]
-        processing = Processing(
-            arms_mask,
-            arms_iso,
-            arms_j_X,
-            arms_j_Y,
-            arms_coll_ang,
-        )
+        patient_info = pd.read_csv(r"data\patient_info.csv")
+        iso_index = ~patient_info.IsocenterOnArms.to_numpy(dtype=bool)
     else:
-        processing = Processing(
-            mask_imgs,
-            isocenters_pix,
-            jaws_X_pix,
-            jaws_Y_pix,
-            coll_angles,
-        )
+        iso_index = np.ones(len(mask_imgs), dtype=bool)
+
+    processing = Processing(
+        [mask for mask, bool_val in zip(mask_imgs, iso_index) if bool_val],
+        isocenters_pix[iso_index],
+        jaws_X_pix[iso_index],
+        jaws_Y_pix[iso_index],
+        coll_angles[iso_index],
+    )
 
     processing.trasform().save_data()
