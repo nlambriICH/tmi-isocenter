@@ -3,16 +3,13 @@ import numpy as np
 from src.data.dataset import Dataset
 
 
-class Dataset_body(Dataset):
+class DatasetBody(Dataset):
     """Dataset class to load and stratify data"""
 
     def __init__(self) -> None:
         super().__init__()
-
-        # Creating the class interaction between arms and angle
-        self.iso_on_arms = self.df_patient_info["IsocenterOnArms"].to_numpy()
-        bool_arms = ~self.iso_on_arms.astype(bool)
-        self.df_patient_info = self.df_patient_info[bool_arms].reset_index()
+        iso_on_arms = self.df_patient_info.IsocenterOnArms.to_numpy(dtype=bool)
+        self.df_patient_info = self.df_patient_info.iloc[~iso_on_arms].reset_index()
 
     def unique_output(
         self, isocenters_pix_flat, jaws_X_pix_flat, jaws_Y_pix_flat

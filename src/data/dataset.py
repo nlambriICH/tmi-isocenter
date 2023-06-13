@@ -33,22 +33,7 @@ class Dataset:
         self.angles = np.load(r"data\interim\angles.npy")  # shape=(N, 12)
         self.angle_class = np.where(self.angles[:, 0] == 90, 0.0, 1.0)  # shape=(N,)
 
-        self.df_patient_info = pd.read_csv(
-            r"data\patient_info.csv"
-        )  # .sort_values(            by="PlanDate"        )
-        # Creating the class interaction between arms and angle
-        self.iso_on_arms = self.df_patient_info["IsocenterOnArms"].to_numpy()
-
-        """        self.arms_or_angle = np.where(
-                    (self.angle_class == 0) & (self.iso_on_arms == 0),
-                    0,
-                    np.where(
-                        (self.angle_class == 1) & (self.iso_on_arms == 0),
-                        1,
-                        np.where((self.angle_class == 0) & (self.iso_on_arms == 1), 2, 3),
-                    ),
-                )
-        """
+        self.df_patient_info = pd.read_csv(r"data\patient_info.csv")
 
     def normalize_ptv(self, background=-1) -> np.ndarray:
         """Normalize the 2D masks of the PTV (Planning Target Volume).
@@ -71,19 +56,19 @@ class Dataset:
         """
         norm_ptv = np.zeros_like(self.masks2d)
         for i, mask2 in enumerate(self.masks2d):
-            mask = mask2[0]
-            non_zero_values = mask[mask != 0]
-            min_value = np.min(non_zero_values) if background == -1 else np.min(mask)
-            max_value = np.max(non_zero_values) if background == -1 else np.max(mask)
+            mask_hu = mask2[0]
+            non_zero_values = mask_hu[mask_hu != 0]
+            min_value = np.min(non_zero_values) if background == -1 else np.min(mask_hu)
+            max_value = np.max(non_zero_values) if background == -1 else np.max(mask_hu)
             difference = max_value - min_value
             normalized = (
-                np.where(mask != 0, (mask - min_value) / difference, background)
+                np.where(mask_hu != 0, (mask_hu - min_value) / difference, background)
                 if background == -1
-                else (mask - min_value) / difference
+                else (mask_hu - min_value) / difference
             )
-            norm_ptv[i][0] = normalized
-            norm_ptv[i][1] = mask2[1]
-            norm_ptv[i][2] = mask2[2]
+            norm_ptv[i, 0] = normalized
+            norm_ptv[i, 1] = mask2[1]
+            norm_ptv[i, 2] = mask2[2]
         return norm_ptv
 
     def train_val_test_split(
@@ -105,6 +90,7 @@ class Dataset:
             The dataset split is stratified by the class labels (collimator angle)
         """
 
+        # TODO: remove split by date
         if test_set == "date":
             test_idx = self.df_patient_info.iloc[10::10].index.to_numpy(
                 dtype=np.uint8
@@ -118,14 +104,12 @@ class Dataset:
                 dtype=np.uint8
             )  # get index of the last 10th rows
         elif test_set == "balanced":
-            test_idx = train_test_split(
+            _, test_idx = train_test_split(
                 self.df_patient_info.index,
                 train_size=0.91,
                 stratify=self.angle_class[self.df_patient_info.index],
-                # self.arms_or_angle[self.df_patient_info.index]
-            )[1].to_numpy(
-                dtype=np.uint8
             )  # get index as a balance test_set
+            test_idx = test_idx.to_numpy(dtype=np.uint8)
         else:
             raise ValueError(
                 f'test_set must be "data" or "oldest" or "latest" but was {test_set}'
@@ -141,12 +125,7 @@ class Dataset:
             train_idx,
             train_size=0.9,
             stratify=self.angle_class[train_idx],
-            # , self.arms_or_angle[train_idx],
         )
-
-        # imb_ratios_train = [np.sum(self.arms_or_angle[train_idx] == i) / np.sum(self.arms_or_angle[train_idx] != i) for i in range(4)]
-        # imb_ratios_val = [np.sum(self.arms_or_angle[val_idx] == i) / np.sum(self.arms_or_angle[val_idx] != i) for i in range(4)]
-        # imb_ratios_test = [np.sum(self.angle_class[test_idx] == i) / np.sum(self.arms_or_angle[test_idx] != i) for i in range(4)]
 
         imb_ratio_train = np.sum(self.angle_class[train_idx] == 0) / np.sum(
             self.angle_class[train_idx] == 1

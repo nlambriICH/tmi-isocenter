@@ -10,17 +10,17 @@ from src.utils.visualization_cnn import model
 
 if __name__ == "__main__":
     if model == "arms":
-        from src.data.dataset_arms import Dataset_arms
+        from src.data.dataset_arms import DatasetArms
         from src.modules.arms_cnn import ArmCNN
 
-        dataset = Dataset_arms()
+        dataset = DatasetArms()
         lightning_cnn = ArmCNN()
         name = "arms_model"
     elif model == "body":
-        from src.data.dataset_body import Dataset_body
+        from src.data.dataset_body import DatasetBody
         from src.modules.body_cnn import BodyCNN
 
-        dataset = Dataset_body()
+        dataset = DatasetBody()
         lightning_cnn = BodyCNN()
         name = "body_model"
     else:
@@ -30,6 +30,7 @@ if __name__ == "__main__":
         dataset = Dataset()
         lightning_cnn = LitCNN()
         name = "whole_model"
+
     train_index, val_idx, test_index = dataset.train_val_test_split(test_set="balanced")
     masks_aug, y_reg, y_cls = dataset.get_data_Xy()
     logger = TensorBoardLogger(
