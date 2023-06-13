@@ -29,14 +29,12 @@ class Dataset:
 
         self.jaws_X_pix = np.load(r"data\interim\jaws_X_pix.npy")  # shape=(N, 12, 2)
         self.jaws_Y_pix = np.load(r"data\interim\jaws_Y_pix.npy")  # shape=(N, 12, 2)
-
         self.angles = np.load(r"data\interim\angles.npy")  # shape=(N, 12)
         self.angle_class = np.where(self.angles[:, 0] == 90, 0.0, 1.0)  # shape=(N,)
-
         self.df_patient_info = pd.read_csv(r"data\patient_info.csv")
 
     def normalize_ptv(self, background=-1) -> np.ndarray:
-        """Normalize the 2D masks of the PTV (Planning Target Volume).
+        """Normalize the 3D masks of the PTV (Planning Target Volume).
 
         Parameters:
             self (object): The instance of the class containing the masks.
@@ -46,8 +44,8 @@ class Dataset:
             np.ndarray: A numpy array containing the normalized masks.
 
         Description:
-            This function normalizes the 2D masks of the PTV by applying a min-max normalization
-            to each mask. The normalization is performed independently on each mask, ensuring
+            This function normalizes the 3D masks of the PTV by applying a min-max normalization
+            to each hu mask. The normalization is performed independently on each mask, ensuring
             that the minimum value of each mask becomes 0 and the maximum value becomes 1.
             If the `background` parameter is provided, the normalization is performed by considering
             only the non-zero values within each mask, with the background value specified.
@@ -72,16 +70,16 @@ class Dataset:
         return norm_ptv
 
     def train_val_test_split(
-        self, test_set: Literal["date", "oldest", "latest", "balanced"]
+        self, test_set="balanced"
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Get the train/val/test indexes :
-            - 10 patients for test set
-            - 90 for training
-            - 10 for validation
+            - 10% patients for test set
+            - 80% for training
+            - 10% for validation
 
         Args:
-            test_set (str): The strategy to split the test data based on the treatment date.
-            Either ordered by date, the 10 oldest, or 10 latest.
+            test_set (str): The strategy to split the test data based on the  class labels (collimator angle).
+
 
         Returns:
             tuple(np.ndarray, np.ndarray): train, val, and test index splits
@@ -90,20 +88,7 @@ class Dataset:
             The dataset split is stratified by the class labels (collimator angle)
         """
 
-        # TODO: remove split by date
-        if test_set == "date":
-            test_idx = self.df_patient_info.iloc[10::10].index.to_numpy(
-                dtype=np.uint8
-            )  # get index of every 10th row
-        elif test_set == "oldest":
-            test_idx = self.df_patient_info.iloc[:10].index.to_numpy(
-                dtype=np.uint8
-            )  # get index of the first 10th rows
-        elif test_set == "latest":
-            test_idx = self.df_patient_info.iloc[-10:].index.to_numpy(
-                dtype=np.uint8
-            )  # get index of the last 10th rows
-        elif test_set == "balanced":
+        if test_set == "balanced":
             _, test_idx = train_test_split(
                 self.df_patient_info.index,
                 train_size=0.91,
@@ -116,10 +101,8 @@ class Dataset:
             )
 
         train_idx = self.df_patient_info.index[
-            ~self.df_patient_info.index.isin(test_idx)
-        ].to_numpy(
-            dtype=np.uint8
-        )  # remove test_idx from dataframe
+            ~self.df_patient_info.index.isin(test_idx)  # remove test_idx from dataframe
+        ].to_numpy(dtype=np.uint8)
 
         train_idx, val_idx = train_test_split(
             train_idx,
@@ -172,7 +155,7 @@ class Dataset:
                 The resulting array has a shape of (self.num_patients, 1, 39).
 
         Notes:
-            - The resulting array contains 11 values for the isocenters,
+            - The resulting array contains 8 values for the isocenters,
             21 values for the X_jaws, and 10 values for the Y_jaws.
             - Specific indices are used to select the unique values from the input arrays.
             Details about the selected indices can be found in the function implementation.

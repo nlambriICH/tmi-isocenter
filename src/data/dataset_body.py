@@ -15,7 +15,7 @@ class DatasetBody(Dataset):
         self, isocenters_pix_flat, jaws_X_pix_flat, jaws_Y_pix_flat
     ) -> np.ndarray:
         """
-        Create a new data configuration for the input of the models.
+        Create a new data configuration for the input of the model with isocenter only on the body.
 
         Args:
             isocenters_pix_flat (np.ndarray): Flat array containing the isocenter values.
@@ -27,8 +27,8 @@ class DatasetBody(Dataset):
                 The resulting array has a shape of (self.num_patients, 1, 34).
 
         Notes:
-            - The resulting array contains 11 values for the isocenters,
-            21 values for the X_jaws, and 10 values for the Y_jaws.
+            - The resulting array contains 6 values for the isocenters,
+            17 values for the X_jaws, and 7 values for the Y_jaws.
             - Specific indices are used to select the unique values from the input arrays.
             Details about the selected indices can be found in the function implementation.
         """

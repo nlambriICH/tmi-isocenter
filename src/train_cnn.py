@@ -31,7 +31,7 @@ if __name__ == "__main__":
         lightning_cnn = LitCNN()
         name = "whole_model"
 
-    train_index, val_idx, test_index = dataset.train_val_test_split(test_set="balanced")
+    train_index, val_idx, test_index = dataset.train_val_test_split()
     masks_aug, y_reg, y_cls = dataset.get_data_Xy()
     logger = TensorBoardLogger(
         "lightning_logs",

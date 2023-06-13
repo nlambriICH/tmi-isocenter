@@ -9,7 +9,7 @@ import os
 Choose between three models:
 "body" "arms" "all"
 """
-model = "arms"
+model = "body"
 
 
 class Processing:
