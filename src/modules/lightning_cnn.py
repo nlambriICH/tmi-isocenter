@@ -19,7 +19,7 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
         learning_rate=1e-5,
         mse_loss_weight=5.0,
         bcelogits_loss_weight=0.00000001,
-        weight=2,
+        weight=1,
         activation=nn.ReLU(),
         focus_on=[0, 1],
         filters=4,
@@ -78,6 +78,14 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
         Returns:
             torch.Tensor: loss value
         """
+        if self.current_epoch == 1:
+            self.logger.log_graph(self)  # pyright: ignore[reportOptionalMemberAccess]
+
+        for name, param in self.named_parameters():
+            self.logger.experiment.add_histogram(  # pyright: ignore[reportOptionalMemberAccess , reportGeneralTypeIssues]
+                name, param, global_step=self.global_step
+            )
+
         x, y_reg, y_cls = batch
         # x = x.unsqueeze_(1)  # shape=(N_batch, 1, 512, 512)
         y_reg = y_reg.view(y_reg.size(0), -1)  # shape=(N_batch, N_out)
