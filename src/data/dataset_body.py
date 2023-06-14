@@ -10,13 +10,6 @@ class DatasetBody(Dataset):
         super().__init__()
         iso_on_arms = self.df_patient_info.IsocenterOnArms.to_numpy(dtype=bool)
         self.df_patient_info = self.df_patient_info.iloc[~iso_on_arms]
-        # self.masks2d=[mask for mask, bool_val in zip(self.masks2d, ~iso_on_arms) if bool_val]
-        # self.isocenters_pix = self.isocenters_pix[~iso_on_arms]
-        # self.jaws_X_pix = self.jaws_X_pix[~iso_on_arms]
-        # self.jaws_Y_pix = self.jaws_Y_pix[~iso_on_arms]
-        # self.angles = self.angles[~iso_on_arms]
-        # self.angle_class = self.angle_class[~iso_on_arms]
-        # self.num_patients=len(self.masks2d)
 
     def unique_output(
         self, isocenters_pix_flat, jaws_X_pix_flat, jaws_Y_pix_flat
