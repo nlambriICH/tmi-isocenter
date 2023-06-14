@@ -4,6 +4,7 @@ import traceback
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
+from src.config.constants import MODEL
 
 
 class Dataset:
@@ -70,7 +71,7 @@ class Dataset:
         return norm_ptv
 
     def train_val_test_split(
-        self, test_set="balanced"
+        self,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Get the train/val/test indexes :
             - 10% patients for test set
@@ -88,18 +89,12 @@ class Dataset:
             The dataset split is stratified by the class labels (collimator angle)
         """
 
-        if test_set == "balanced":
-            _, test_idx = train_test_split(
-                self.df_patient_info.index,
-                train_size=0.91,
-                stratify=self.angle_class[self.df_patient_info.index],
-            )  # get index as a balance test_set
-            test_idx = test_idx.to_numpy(dtype=np.uint8)
-        else:
-            raise ValueError(
-                f'test_set must be "data" or "oldest" or "latest" but was {test_set}'
-            )
-
+        _, test_idx = train_test_split(
+            self.df_patient_info.index,
+            train_size=0.91,
+            stratify=self.angle_class[self.df_patient_info.index],
+        )  # get index as a balance test_set
+        test_idx = test_idx.to_numpy(dtype=np.uint8)
         train_idx = self.df_patient_info.index[
             ~self.df_patient_info.index.isin(test_idx)  # remove test_idx from dataframe
         ].to_numpy(dtype=np.uint8)

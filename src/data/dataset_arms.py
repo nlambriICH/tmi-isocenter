@@ -11,7 +11,55 @@ class DatasetArms(Dataset):
     def __init__(self) -> None:
         super().__init__()
         iso_on_arms = self.df_patient_info.IsocenterOnArms.to_numpy(dtype=bool)
-        self.df_patient_info = self.df_patient_info.iloc[iso_on_arms].reset_index()
+        self.df_patient_info = self.df_patient_info.iloc[iso_on_arms]
+
+    def train_val_test_split(
+        self,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Get the train/val/test indexes :
+            - 10% patients for test set
+            - 80% for training
+            - 10% for validation
+
+        Args:
+            test_set (str): The strategy to split the test data based on the  class labels (collimator angle).
+
+
+        Returns:
+            tuple(np.ndarray, np.ndarray): train, val, and test index splits
+
+        Notes:
+            The dataset split is stratified by the class labels (collimator angle)
+        """
+
+        _, test_idx = train_test_split(
+            self.df_patient_info.index,
+            train_size=0.91,
+        )  # get index as a balance test_set
+        test_idx = test_idx.to_numpy(dtype=np.uint8)
+        train_idx = self.df_patient_info.index[
+            ~self.df_patient_info.index.isin(test_idx)  # remove test_idx from dataframe
+        ].to_numpy(dtype=np.uint8)
+
+        train_idx, val_idx = train_test_split(
+            train_idx,
+            train_size=0.9,
+        )
+
+        imb_ratio_train = np.sum(self.angle_class[train_idx] == 0) / np.sum(
+            self.angle_class[train_idx] == 1
+        )
+        imb_ratio_val = np.sum(self.angle_class[val_idx] == 0) / np.sum(
+            self.angle_class[val_idx] == 1
+        )
+        imb_ratio_test = np.sum(self.angle_class[test_idx] == 0) / np.sum(
+            self.angle_class[test_idx] == 1
+        )
+        print(f"Imbalance ratio train set: {imb_ratio_train:.1f}")
+        print(f"Imbalance ratio val set: {imb_ratio_val:.1f}")
+        print(f"Imbalance ratio test set: {imb_ratio_test:.1f}")
+
+        return (train_idx, val_idx, test_idx)
 
     def unique_output(
         self, isocenters_pix_flat, jaws_X_pix_flat, jaws_Y_pix_flat

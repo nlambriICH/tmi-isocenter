@@ -4,12 +4,7 @@ import imgaug.augmenters as iaa
 from imgaug.augmentables import Keypoint, KeypointsOnImage
 from src.utils.field_geometry_transf import get_zero_row_idx
 import os
-
-"""
-Choose between three models:
-"body" "arms" "all"
-"""
-model = "body"
+from src.config.constants import MODEL
 
 
 class Processing:
@@ -550,21 +545,12 @@ if __name__ == "__main__":
     jaws_Y_pix = np.load(r"data\raw\jaws_Y_pix.npy")
     coll_angles = np.load(r"data\raw\angles.npy")
 
-    if model == "arms":
-        patient_info = pd.read_csv(r"data\patient_info.csv")
-        iso_index = patient_info.IsocenterOnArms.to_numpy(dtype=bool)
-    elif model == "body":
-        patient_info = pd.read_csv(r"data\patient_info.csv")
-        iso_index = ~patient_info.IsocenterOnArms.to_numpy(dtype=bool)
-    else:
-        iso_index = np.ones(len(mask_imgs), dtype=bool)
-
     processing = Processing(
-        [mask for mask, bool_val in zip(mask_imgs, iso_index) if bool_val],
-        isocenters_pix[iso_index],
-        jaws_X_pix[iso_index],
-        jaws_Y_pix[iso_index],
-        coll_angles[iso_index],
+        mask_imgs,
+        isocenters_pix,
+        jaws_X_pix,
+        jaws_Y_pix,
+        coll_angles,
     )
 
     processing.trasform().save_data()
