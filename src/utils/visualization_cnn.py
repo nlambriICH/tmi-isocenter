@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from src.data.processing import Processing
 from scipy import ndimage
-from src.data.processing import model
+from src.config.constants import MODEL
 
 with np.load(r"data\raw\ptv_masks2D.npz") as npz_masks2d:
     ptv_masks = list(npz_masks2d.values())
@@ -18,27 +18,14 @@ jaws_X_pix = np.load(r"data\raw\jaws_X_pix.npy")
 jaws_Y_pix = np.load(r"data\raw\jaws_Y_pix.npy")
 coll_angles = np.load(r"data\raw\angles.npy")
 df_patient_info = pd.read_csv(r"data\patient_info.csv")
-if model == "arms":
-    # Here I'm working on the model with Iso on arms
+if MODEL == "arms":
     iso_on_arms = df_patient_info["IsocenterOnArms"].to_numpy()
     bool_arms = iso_on_arms.astype(bool)
-    df_patient_info = df_patient_info[bool_arms].reset_index()
-    ptvs = [mask for mask, bool_val in zip(ptvs, iso_on_arms) if bool_val]
-    isocenters_pix = isocenters_pix[bool_arms]
-    jaws_X_pix = jaws_X_pix[bool_arms]
-    jaws_Y_pix = jaws_Y_pix[bool_arms]
-    coll_angles = coll_angles[bool_arms]
-    # Ends Iso on arms part
-elif model == "body":
-    # Here I'm working on the model with Iso on arms
+
+elif MODEL == "body":
     iso_on_arms = df_patient_info["IsocenterOnArms"].to_numpy()
     bool_arms = ~iso_on_arms.astype(bool)
-    df_patient_info = df_patient_info[bool_arms].reset_index()
-    ptvs = [mask for mask, bool_val in zip(ptvs, bool_arms) if bool_val]
-    isocenters_pix = isocenters_pix[bool_arms]
-    jaws_X_pix = jaws_X_pix[bool_arms]
-    jaws_Y_pix = jaws_Y_pix[bool_arms]
-    coll_angles = coll_angles[bool_arms]
+
 
 pix_spacing_col_idx = df_patient_info.columns.get_loc(key="PixelSpacing")
 slice_tickness_col_idx = df_patient_info.columns.get_loc(key="SliceThickness")
@@ -337,6 +324,7 @@ def plot_fields(
     pix_spacing: float,
     color: str = "r",
     unit_measure: Literal["pix", "mm"] = "pix",
+    single_fig: bool = False,
 ) -> None:
     """
     Plots rectangular fields on a given Matplotlib Axes object, based on information about each field's isocenter,
@@ -398,10 +386,11 @@ def plot_fields(
             offset_row /= aspect_ratio
             width *= aspect_ratio
             height /= aspect_ratio
-        if color_flag:
-            color = "r"
-        else:
-            color = "b"
+        if single_fig:
+            if color_flag:
+                color = "r"
+            else:
+                color = "b"
         add_rectangle_patch(
             ax,
             (iso_pixel_col + offset_col, iso_pixel_row - offset_row),
@@ -411,7 +400,8 @@ def plot_fields(
             angle,
             color,
         )
-        color_flag = not color_flag
+        if single_fig:
+            color_flag = not color_flag
 
 
 def plot_img(
@@ -473,7 +463,7 @@ def plot_img(
         angles[0] = 355
         angles[1] = 5
 
-    if model != "body":
+    if MODEL != "body":
         angles[10] = 355
         angles[11] = 5
     processing_output = Processing(
@@ -634,6 +624,7 @@ def separate_plots(
         processing_output.coll_angles,
         slice_thickness,
         pix_spacing,
+        single_fig=True,
     )
     plt.title(f"MSE loss: {mse}")
     predict_img_path = os.path.join(path, "predict_img")
@@ -661,6 +652,7 @@ def separate_plots(
         slice_thickness,
         pix_spacing,
         "b",
+        single_fig=True,
     )
 
     real_img_path = os.path.join(path, "real_img")
