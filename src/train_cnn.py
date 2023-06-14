@@ -5,18 +5,17 @@ import lightning.pytorch as pl
 from lightning.pytorch.callbacks import ModelSummary, LearningRateMonitor
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.loggers import TensorBoardLogger
-from src.utils.visualization_cnn import model
-
+from src.config.constants import MODEL
 
 if __name__ == "__main__":
-    if model == "arms":
+    if MODEL == "arms":
         from src.data.dataset_arms import DatasetArms
         from src.modules.arms_cnn import ArmCNN
 
         dataset = DatasetArms()
         lightning_cnn = ArmCNN()
         name = "arms_model"
-    elif model == "body":
+    elif MODEL == "body":
         from src.data.dataset_body import DatasetBody
         from src.modules.body_cnn import BodyCNN
 
@@ -103,7 +102,7 @@ if __name__ == "__main__":
     trainer = pl.Trainer(
         logger=logger,  # pyright: ignore[reportGeneralTypeIssues]
         callbacks=[  # pyright: ignore[reportGeneralTypeIssues]
-            EarlyStopping(monitor="val_mse_loss", mode="min", patience=7),
+            EarlyStopping(monitor="val_mse_loss", mode="min", patience=10),
             ModelSummary(
                 max_depth=-1
             ),  # print the weights summary of the model when trainer.fit() is called
