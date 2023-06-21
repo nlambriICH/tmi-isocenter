@@ -31,7 +31,9 @@ pix_spacing_col_idx = df_patient_info.columns.get_loc(key="PixelSpacing")
 slice_tickness_col_idx = df_patient_info.columns.get_loc(key="SliceThickness")
 
 
-def build_output(y_hat: torch.Tensor, patient_idx: int) -> torch.Tensor:
+def build_output(
+    y_hat: torch.Tensor, patient_idx: int, aspect_ratio: float
+) -> torch.Tensor:
     output = np.zeros(shape=(84))
     if y_hat.shape[0] == 39:
         # Isocenter indexes
@@ -93,7 +95,7 @@ def build_output(y_hat: torch.Tensor, patient_idx: int) -> torch.Tensor:
                 output[81 + 2 * i] = -y_hat[37 + i].item()
 
             output[76 + i] = y_hat[33 + i].item()  # apertures for the head
-    if y_hat.shape[0] == 34:
+    if y_hat.shape[0] == 32:
         # Isocenter indexes
         index_X = [0, 3, 6, 9, 12, 15, 18, 21, 24, 27]
         index_Y = [1, 4, 7, 10, 13, 16, 19, 22, 25, 28]
@@ -119,19 +121,21 @@ def build_output(y_hat: torch.Tensor, patient_idx: int) -> torch.Tensor:
             output[(z + 3) * 3 * 2 + 5] = y_hat[z + 4].item()
 
         # Begin jaw_X
-        # 4 Legs + 4 Pelvi
-        for i in range(8):
+        # 4 Legs + 3 Pelvi
+        for i in range(5):
             output[36 + i] = y_hat[
                 7 + i
             ].item()  # retrieve apertures of first 11 fields
+        output[42] = y_hat[12].item()
+        output[43] = y_hat[13].item()
         # 3 for third iso = null + one symmetric (thus 0 )
         for i in range(3):
             output[44 + i] = 0
         # 3 for chest iso = null + one symmetric (again 0 so)
+        output[48] = y_hat[14].item()
+        output[50] = y_hat[15].item()  # add in groups of three avoiding repetitions
+
         for i in range(3):
-            output[48 + i] = y_hat[
-                15 + i
-            ].item()  # add in groups of three avoiding repetitions
             # Head
             output[52 + i] = y_hat[18 + i].item()
             # Arms
@@ -143,33 +147,52 @@ def build_output(y_hat: torch.Tensor, patient_idx: int) -> torch.Tensor:
         output[55] = -output[52]
 
         output[59] = y_hat[24].item()
+        # Overlap fields
+        norm = aspect_ratio * ptvs[patient_idx].shape[1] / 512
+        output[41] = (y_hat[3].item() - y_hat[4].item() + 0.01) * norm + output[
+            46
+        ]  # abdom
+        output[49] = (y_hat[5].item() - y_hat[6].item() + 0.03) * norm + output[
+            54
+        ]  # chest
 
         # Begin jaw_Y
         for i in range(4):
             if i < 2:
                 # Same apertures opposite signs #LEGS
-                output[60 + 2 * i] = y_hat[i + 25].item()
-                output[61 + 2 * i] = -y_hat[i + 25].item()
+                output[60 + 2 * i] = y_hat[i + 23].item()
+                output[61 + 2 * i] = -y_hat[i + 23].item()
 
                 # 4 fields with equal (and opposite) apertures
-                output[64 + 2 * i] = y_hat[26].item()
-                output[65 + 2 * i] = -y_hat[26].item()
+                output[64 + 2 * i] = y_hat[24].item()
+                output[65 + 2 * i] = -y_hat[24].item()
                 output[68 + 2 * i] = 0  # index 35 == thorax iso
                 output[69 + 2 * i] = 0
 
                 # 2 fields with equal (and opposite) apertures
-                output[72 + 2 * i] = y_hat[26].item()
-                output[73 + 2 * i] = -y_hat[26].item()
+                output[72 + 2 * i] = y_hat[24].item()
+                output[73 + 2 * i] = -y_hat[24].item()
 
                 # Arms apertures with opposite sign
-                output[80 + 2 * i] = y_hat[32 + i].item()
-                output[81 + 2 * i] = -y_hat[32 + i].item()
+                output[80 + 2 * i] = y_hat[30 + i].item()
+                output[81 + 2 * i] = -y_hat[30 + i].item()
 
-            output[76 + i] = y_hat[28 + i].item()  # apertures for the head
-    if y_hat.shape[0] == 30:
+            output[76 + i] = y_hat[26 + i].item()  # apertures for the head
+    if y_hat.shape[0] == 26:
         # Isocenter indexes
-        index_X = [0, 3, 6, 9, 12, 15, 18, 21, 24, 27]
-        index_Y = [1, 4, 7, 10, 13, 16, 19, 22, 25, 28]
+        index_X = [
+            0,
+            3,
+            6,
+            9,
+            12,
+            15,
+            18,
+            21,
+            24,
+            27,
+        ]
+        index_Y = [1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34]
         output[index_X] = find_x_coord(
             ptv_masks[patient_idx]
         )  # x coord repeated 8 times + 2 times for iso thorax
@@ -177,28 +200,40 @@ def build_output(y_hat: torch.Tensor, patient_idx: int) -> torch.Tensor:
             index_Y
         ] = 100  # y coord repeated 8 times + 2 times for iso thorax, setted to 0
         output[30] = 0  # x coord right arm
-        output[[31, 34]] = 100  # y coord for arms repeated twice, also constrained to 0
         output[33] = 0  # x coord left arm
 
-        for z in range(6):  # z coords
+        for z in range(5):  # z coords
             output[z * 3 * 2 + 2] = y_hat[z].item()
             output[z * 3 * 2 + 5] = y_hat[z].item()
+        output[32] = 0  # z coord right arm
+        output[35] = 0  # z coord left arm
 
         # Begin jaw_X
-        for i in range(11):
-            output[36 + i] = y_hat[
-                6 + i
-            ].item()  # retrieve apertures of first 11 fields
-
+        for i in range(5):
+            output[36 + i] = y_hat[5 + i].item()  # 4 legs+ down field 4th iso
         for i in range(3):
-            # chest
-            output[48 + i] = y_hat[
-                17 + i
-            ].item()  # add in groups of three avoiding repetitions
-            # head
-            output[52 + i] = y_hat[20 + i].item()
-            # arms
+            output[42 + i] = y_hat[10 + i].item()  # 2 4th iso + down field 3rd iso
+            # head fields
+            output[52 + i] = y_hat[16 + i].item()
+            # arms fields
             output[56 + i] = 0
+
+        # chest
+        output[46] = y_hat[13]  # third iso
+        output[48] = y_hat[14]  # chest iso down field
+        output[50] = y_hat[15]  # chest iso
+
+        # Overlap fields
+        norm = aspect_ratio * ptvs[patient_idx].shape[1] / 512
+        output[41] = (y_hat[1].item() - y_hat[2].item() + 0.01) * norm + output[
+            46
+        ]  # abdom
+        output[45] = (y_hat[2].item() - y_hat[3].item() + 0.03) * norm + output[
+            50
+        ]  # third
+        output[49] = (y_hat[3].item() - y_hat[4].item() + 0.03) * norm + output[
+            54
+        ]  # chest
 
         # Symmetric apertures
         # third iso
@@ -214,25 +249,26 @@ def build_output(y_hat: torch.Tensor, patient_idx: int) -> torch.Tensor:
         for i in range(4):
             if i < 2:
                 # Same apertures opposite signs LEGS
-                output[60 + 2 * i] = y_hat[i + 23].item()
-                output[61 + 2 * i] = -y_hat[i + 23].item()
+                output[60 + 2 * i] = y_hat[i + 19].item()
+                output[61 + 2 * i] = -y_hat[i + 19].item()
 
                 # 4 fields with equal (and opposite) apertures
                 # Pelvi
-                output[64 + 2 * i] = y_hat[25].item()
-                output[65 + 2 * i] = -y_hat[25].item()
+                output[64 + 2 * i] = y_hat[21].item()
+                output[65 + 2 * i] = -y_hat[21].item()
                 # Third iso
-                output[68 + 2 * i] = y_hat[25].item()
-                output[69 + 2 * i] = -y_hat[25].item()
+                output[68 + 2 * i] = y_hat[21].item()
+                output[69 + 2 * i] = -y_hat[21].item()
                 # Chest
-                output[72 + 2 * i] = y_hat[25].item()
-                output[73 + 2 * i] = -y_hat[25].item()
+                output[72 + 2 * i] = y_hat[21].item()
+                output[73 + 2 * i] = -y_hat[21].item()
 
                 # Arms apertures with opposite sign
                 output[80 + 2 * i] = 0
                 output[81 + 2 * i] = 0
 
-            output[76 + i] = y_hat[26 + i].item()  # apertures for the head
+            output[76 + i] = y_hat[22 + i].item()  # apertures for the head
+        # output[68]=-0.5/aspect_ratio #TO DELETE
 
     return torch.Tensor(output)
 
@@ -436,13 +472,13 @@ def plot_img(
     ------
     - The function calls the `extract_data` function to reorganize the CNN output.
     """
-    if output.shape[0] < 84:
-        output = build_output(output, patient_idx)
-
     pix_spacing_col_idx = df_patient_info.columns.get_loc(key="PixelSpacing")
     slice_tickness_col_idx = df_patient_info.columns.get_loc(key="SliceThickness")
     pix_spacing = df_patient_info.iloc[patient_idx, pix_spacing_col_idx]
     slice_thickness = df_patient_info.iloc[patient_idx, slice_tickness_col_idx]
+    aspect_ratio = slice_thickness / pix_spacing
+    if output.shape[0] < 84:
+        output = build_output(output, patient_idx, aspect_ratio)
 
     isocenters_hat, jaws_X_pix_hat, jaws_Y_pix_hat = extract_original_data(output)
 
@@ -775,7 +811,7 @@ if __name__ == "__main__":
     )
 
     test_build_output = torch.arange(1, 43)  # range [1, 42] step=1, new output shape
-    reconstructed_output = build_output(test_build_output, patient_idx)
+    reconstructed_output = build_output(test_build_output, patient_idx, 4, 2)
     assert reconstructed_output.shape[0] == 84
 
     path = "test"

@@ -17,11 +17,11 @@ class BodyCNN(LitCNN):  # pylint: disable=too-many-ancestors
         learning_rate=1e-5,
         mse_loss_weight=5.0,
         bcelogits_loss_weight=0.00000001,
-        weight=1,
+        weight=2,
         activation=nn.ReLU(),
-        focus_on=[0, 1],
+        focus_on=[1, 2],
         filters=4,
-        output=30,
+        output=26,
     ):
         """Initialize the LitCNN module
 
@@ -64,7 +64,6 @@ class BodyCNN(LitCNN):  # pylint: disable=too-many-ancestors
             )
 
         x, y_reg, y_cls = batch
-        # x = x.unsqueeze_(1)  # shape=(N_batch, 1, 512, 512)
         y_reg = y_reg.view(y_reg.size(0), -1)  # shape=(N_batch, N_out)
         y_cls = y_cls.view(-1, 1)  # shape=(N_batch, 1)
         y_reg_hat, y_cls_hat = self.cnn(x)
