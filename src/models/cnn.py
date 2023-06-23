@@ -10,9 +10,11 @@ class CNN(nn.Module):
         self,
         filters: int,
         output: int,
+        flag: bool = True,
         activation=nn.ReLU(),
     ):
         super().__init__()
+        self.flag = flag
         self.simple_cnn = nn.Sequential(
             nn.Conv2d(
                 3,
@@ -45,10 +47,11 @@ class CNN(nn.Module):
             nn.Flatten(),
             nn.Linear(filters * 8 * 242 * 242, output),
         )
-        self.classification_head = nn.Sequential(
-            nn.Flatten(),
-            nn.Linear(filters * 8 * 242 * 242, 1),
-        )
+        if not self.flag:
+            self.classification_head = nn.Sequential(
+                nn.Flatten(),
+                nn.Linear(filters * 8 * 242 * 242, 1),
+            )
 
     def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """Forward pass of the network
@@ -61,4 +64,7 @@ class CNN(nn.Module):
                 and classification heads
         """
         x = self.simple_cnn(x)
-        return self.regression_head(x), self.classification_head(x)
+        if self.flag:
+            return self.regression_head(x)
+        else:
+            return self.regression_head(x), self.classification_head(x)
