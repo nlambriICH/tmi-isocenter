@@ -137,22 +137,22 @@ def build_output(
 
         for i in range(3):
             # Head
-            output[52 + i] = y_hat[18 + i].item()
+            output[52 + i] = y_hat[16 + i].item()
             # Arms
-            output[56 + i] = y_hat[21 + i].item()
+            output[56 + i] = y_hat[19 + i].item()
 
         # Symmetric apertures
         output[47] = -output[44]
         output[51] = -output[48]
         output[55] = -output[52]
 
-        output[59] = y_hat[24].item()
+        output[59] = y_hat[22].item()
         # Overlap fields
         norm = aspect_ratio * ptvs[patient_idx].shape[1] / 512
         output[41] = (y_hat[3].item() - y_hat[4].item() + 0.01) * norm + output[
-            46
+            50
         ]  # abdom
-        output[49] = (y_hat[5].item() - y_hat[6].item() + 0.03) * norm + output[
+        output[49] = (y_hat[4].item() - y_hat[5].item() + 0.03) * norm + output[
             54
         ]  # chest
 
@@ -811,7 +811,7 @@ if __name__ == "__main__":
     )
 
     test_build_output = torch.arange(1, 43)  # range [1, 42] step=1, new output shape
-    reconstructed_output = build_output(test_build_output, patient_idx, 4, 2)
+    reconstructed_output = build_output(test_build_output, patient_idx, 4.26)
     assert reconstructed_output.shape[0] == 84
 
     path = "test"

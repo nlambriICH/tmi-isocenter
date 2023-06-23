@@ -74,7 +74,7 @@ class DatasetArms(Dataset):
 
         Returns:
             np.ndarray: Array with the unique values from the input data.
-                The resulting array has a shape of (self.num_patients, 1, 34).
+                The resulting array has a shape of (self.num_patients, 1, 32).
 
         Notes:
             - The resulting array contains 7 values for the isocenters,
@@ -82,7 +82,7 @@ class DatasetArms(Dataset):
             - Specific indices are used to select the unique values from the input arrays.
             Details about the selected indices can be found in the function implementation.
         """
-        y_reg = np.zeros(shape=(self.num_patients, 1, 34), dtype=float)
+        y_reg = np.zeros(shape=(self.num_patients, 1, 32), dtype=float)
         for i, (iso, jaw_X_pix, jaw_Y_pix) in enumerate(
             zip(isocenters_pix_flat, jaws_X_pix_flat, jaws_Y_pix_flat)
         ):
@@ -104,12 +104,14 @@ class DatasetArms(Dataset):
                 ]  # Z-coord one for every couple of iso.
             # X_Jaws
             usless_idx = [
-                8,
-                9,
-                10,
-                11,
-                15,
-                19,
+                5,  # overlap fourth iso with chest's field
+                8,  # Third iso deleted
+                9,  # Third iso deleted
+                10,  # Third iso deleted
+                11,  # Third iso deleted
+                13,  # overlap chest iso with head 's field
+                15,  # chest symmetry on iso
+                19,  # head symmetry on iso
             ]  # with X_Jaw I take all the values except the for thorax, chest and head where I use the simmetry (so 1 param for 2 fields) to hug the relative iso.
             y_jaw_X = np.delete(jaw_X_pix, usless_idx)
             # Y_Jaws
