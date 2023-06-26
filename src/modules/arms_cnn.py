@@ -1,12 +1,6 @@
 """Lightning module for CNN training"""
-import os
-from src.modules.lightning_cnn import LitCNN
-import torch.nn.functional as F
-import torch
 from torch import nn
-from torchmetrics.classification import BinaryAccuracy
-from src.models.cnn import CNN
-from src.config.constants import CLASSIFICATION
+from src.modules.lightning_cnn import LitCNN
 
 
 class ArmCNN(LitCNN):  # pylint: disable=too-many-ancestors
@@ -29,17 +23,13 @@ class ArmCNN(LitCNN):  # pylint: disable=too-many-ancestors
             cnn (torch.nn.Module): CNN module with multi-head output for keypoints regression
                 and angle classification
         """
-        super().__init__()
-        self.example_input_array = torch.Tensor(
-            32, 3, 512, 512
-        )  # display the intermediate input and output sizes of layers when trainer.fit() is called
-        self.flag = (CLASSIFICATION,)
-        self.cnn = CNN(filters, output, self.flag, activation)
-        self.accuracy = BinaryAccuracy()
-        self.learning_rate = learning_rate
-        self.train_mse_weight = mse_loss_weight
-        self.bcelogits_loss_weight = bcelogits_loss_weight
-        self.weights = torch.ones(output)
-        self.weights[focus_on] = weight
-        self.save_hyperparameters()
-        self.filters = filters
+        super().__init__(
+            learning_rate=learning_rate,
+            mse_loss_weight=mse_loss_weight,
+            bcelogits_loss_weight=bcelogits_loss_weight,
+            weight=weight,
+            activation=activation,
+            focus_on=focus_on,
+            filters=filters,
+            output=output,
+        )

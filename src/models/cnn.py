@@ -10,11 +10,11 @@ class CNN(nn.Module):
         self,
         filters: int,
         output: int,
-        flag: bool = True,
+        classif: bool = True,
         activation=nn.ReLU(),
     ):
         super().__init__()
-        self.flag = flag
+        self.classif = classif
         self.simple_cnn = nn.Sequential(
             nn.Conv2d(
                 3,
@@ -47,7 +47,7 @@ class CNN(nn.Module):
             nn.Flatten(),
             nn.Linear(filters * 8 * 242 * 242, output),
         )
-        if not self.flag:
+        if not self.classif:
             self.classification_head = nn.Sequential(
                 nn.Flatten(),
                 nn.Linear(filters * 8 * 242 * 242, 1),
@@ -64,7 +64,7 @@ class CNN(nn.Module):
                 and classification heads
         """
         x = self.simple_cnn(x)
-        if self.flag:
+        if self.classif:
             return self.regression_head(x)
         else:
             return self.regression_head(x), self.classification_head(x)

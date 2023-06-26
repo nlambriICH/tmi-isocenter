@@ -1,12 +1,12 @@
 """Lightning module for CNN training"""
 import os
-import lightning.pytorch as pl
-import torch.nn.functional as F
 import torch
 from torch import nn
-from torchmetrics.classification import BinaryAccuracy
+import torch.nn.functional as F
+import lightning.pytorch as pl
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.optim import Adam
+from torchmetrics.classification import BinaryAccuracy
 from src.models.cnn import CNN
 from src.utils.visualization_cnn import plot_img
 from src.config.constants import CLASSIFICATION
@@ -36,11 +36,11 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
         self.example_input_array = torch.Tensor(
             32, 3, 512, 512
         )  # display the intermediate input and output sizes of layers when trainer.fit() is called
-        self.flag = CLASSIFICATION
+        self.classif = CLASSIFICATION
         self.cnn = CNN(
             filters,
             output,
-            self.flag,
+            self.classif,
             activation,
         )
         self.accuracy = BinaryAccuracy()
@@ -92,7 +92,7 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
         x, y_reg, y_cls = batch
         y_reg = y_reg.view(y_reg.size(0), -1)  # shape=(N_batch, N_out)
         y_cls = y_cls.view(-1, 1)  # shape=(N_batch, 1)
-        if not self.flag:
+        if not self.classif:
             y_reg_hat, y_cls_hat = self.cnn(x)
             train_mse_loss = self.weighted_mse_loss(y_reg_hat, y_reg)
             train_bcelogits_loss = F.binary_cross_entropy_with_logits(y_cls_hat, y_cls)
@@ -135,7 +135,7 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
         y_reg = y_reg.view(1, -1)  # shape=(1, N_out)
         y_cls = y_cls.view(1, -1)  # shape=(1, 1)
 
-        if not self.flag:
+        if not self.classif:
             y_reg_hat, y_cls_hat = self.cnn(x)
             val_mse_loss = self.weighted_mse_loss(y_reg_hat, y_reg)
             self.accuracy(torch.sigmoid(y_cls_hat), y_cls)
@@ -169,7 +169,7 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
         y_reg = y_reg.view(1, -1)  # shape=(1, N_out)
         y_cls = y_cls.view(1, -1)  # shape=(1, N_out)
 
-        if not self.flag:
+        if not self.classif:
             y_reg_hat, y_cls_hat = self.cnn(x)
             test_mse_loss = self.weighted_mse_loss(y_reg_hat, y_reg)
             self.accuracy(torch.sigmoid(y_cls_hat), y_cls)
