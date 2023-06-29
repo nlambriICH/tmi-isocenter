@@ -116,7 +116,6 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
                 "train_loss": train_loss,
             }
         self.log_dict(metrics)
-        self.log_dict(metrics)
 
         return train_loss
 
