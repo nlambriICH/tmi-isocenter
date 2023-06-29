@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from src.config.constants import MODEL
+from src.data.augmentation import Augmentation
 
 
 class Dataset:
@@ -93,6 +94,7 @@ class Dataset:
             self.df_patient_info.index,
             train_size=0.91,
             stratify=self.angle_class[self.df_patient_info.index],
+            random_state=42,
         )  # get index as a balance test_set
         test_idx = test_idx.to_numpy(dtype=np.uint8)
         train_idx = self.df_patient_info.index[
@@ -117,8 +119,22 @@ class Dataset:
         print(f"Imbalance ratio train set: {imb_ratio_train:.1f}")
         print(f"Imbalance ratio val set: {imb_ratio_val:.1f}")
         print(f"Imbalance ratio test set: {imb_ratio_test:.1f}")
-
+        self.train_idx = train_idx
         return (train_idx, val_idx, test_idx)
+
+    def augment_train(self):
+        aug = Augmentation(self.masks2d, self.train_idx)
+        (
+            self.masks2d,
+            self.isocenters_pix,
+            self.jaws_X_pix,
+            self.jaws_Y_pix,
+            self.angle_class,
+            self.df_patient_info,
+            train_index,
+        ) = aug.flip_translate_augmentation()
+        self.num_patients = self.masks2d.shape[0]
+        return train_index
 
     def get_data_Xy(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         isocenters_pix_flat = self.isocenters_pix.reshape(self.num_patients, -1)
