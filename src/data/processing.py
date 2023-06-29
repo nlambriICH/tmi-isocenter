@@ -4,7 +4,6 @@ import imgaug.augmenters as iaa
 from imgaug.augmentables import Keypoint, KeypointsOnImage
 from src.utils.field_geometry_transf import get_zero_row_idx
 import os
-from src.config.constants import MODEL
 
 
 class Processing:
@@ -519,11 +518,11 @@ def load_masks() -> list[np.ndarray]:
         loaded_masks["liver_masks"],
     ):
         channel1 = ptv_img[:, :, np.newaxis]
-        channel2 = ptv_mask[:, :, np.newaxis]
-        channel3 = 3 * brain_mask[:, :, np.newaxis]
-        channel4 = 4 * bladder_mask[:, :, np.newaxis]
-        channel5 = 5 * lungs_mask[:, :, np.newaxis]
-        channel6 = 6 * liver_mask[:, :, np.newaxis]
+        channel2 = 0.3 * ptv_mask[:, :, np.newaxis]
+        channel3 = 0.5 * brain_mask[:, :, np.newaxis]
+        channel4 = 0.5 * bladder_mask[:, :, np.newaxis]
+        channel5 = 0.5 * lungs_mask[:, :, np.newaxis]
+        channel6 = 0.5 * liver_mask[:, :, np.newaxis]
         channel_overlap = channel3 + channel4 + channel5 + channel6
         image = np.concatenate(
             (
