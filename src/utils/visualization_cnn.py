@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from src.data.processing import Processing
 from scipy import ndimage
+from src.config.constants import MODEL
 
 with np.load(r"data\raw\ptv_masks2D.npz") as npz_masks2d:
     ptv_masks = list(npz_masks2d.values())
@@ -17,71 +18,257 @@ jaws_X_pix = np.load(r"data\raw\jaws_X_pix.npy")
 jaws_Y_pix = np.load(r"data\raw\jaws_Y_pix.npy")
 coll_angles = np.load(r"data\raw\angles.npy")
 df_patient_info = pd.read_csv(r"data\patient_info.csv")
+if MODEL == "arms":
+    iso_on_arms = df_patient_info["IsocenterOnArms"].to_numpy()
+    bool_arms = iso_on_arms.astype(bool)
+
+elif MODEL == "body":
+    iso_on_arms = df_patient_info["IsocenterOnArms"].to_numpy()
+    bool_arms = ~iso_on_arms.astype(bool)
+
 
 pix_spacing_col_idx = df_patient_info.columns.get_loc(key="PixelSpacing")
 slice_tickness_col_idx = df_patient_info.columns.get_loc(key="SliceThickness")
 
 
-def build_output(y_hat: torch.Tensor, patient_idx: int) -> torch.Tensor:
+def build_output(
+    y_hat: torch.Tensor, patient_idx: int, aspect_ratio: float
+) -> torch.Tensor:
     output = np.zeros(shape=(84))
+    if y_hat.shape[0] == 39:
+        # Isocenter indexes
+        index_X = [0, 3, 6, 9, 12, 15, 18, 21, 24, 27]
+        index_Y = [1, 4, 7, 10, 13, 16, 19, 22, 25, 28]
+        output[index_X] = find_x_coord(
+            ptv_masks[patient_idx]
+        )  # x coord repeated 8 times + 2 times for iso thorax
+        output[
+            index_Y
+        ] = 100  # y coord repeated 8 times + 2 times for iso thorax, setted to 0
+        output[30] = y_hat[0].item()  # x coord right arm
+        output[[31, 34]] = 100  # y coord for arms repeated twice, also constrained to 0
+        output[33] = y_hat[1].item()  # x coord left arm
 
-    # Isocenter indexes
-    index_X = [0, 3, 6, 9, 12, 15, 18, 21, 24, 27]
-    index_Y = [1, 4, 7, 10, 13, 16, 19, 22, 25, 28]
-    output[index_X] = find_x_coord(
-        ptv_masks[patient_idx]
-    )  # x coord repeated 8 times + 2 times for iso thorax
-    output[
-        index_Y
-    ] = 100  # y coord repeated 8 times + 2 times for iso thorax, setted to 0
-    output[30] = y_hat[0].item()  # x coord right arm
-    output[[31, 34]] = 100  # y coord for arms repeated twice, also constrained to 0
-    output[33] = y_hat[1].item()  # x coord left arm
+        for z in range(6):  # z coords
+            output[z * 3 * 2 + 2] = y_hat[z + 2].item()
+            output[z * 3 * 2 + 5] = y_hat[z + 2].item()
 
-    for z in range(6):  # z coords
-        output[z * 3 * 2 + 2] = y_hat[z + 2].item()
-        output[z * 3 * 2 + 5] = y_hat[z + 2].item()
+        # Begin jaw_X
+        for i in range(11):
+            output[36 + i] = y_hat[
+                8 + i
+            ].item()  # retrieve apertures of first 11 fields
 
-    # Begin jaw_X
-    for i in range(11):
-        output[36 + i] = y_hat[8 + i].item()  # retrieve apertures of first 11 fields
+        for i in range(3):
+            output[48 + i] = y_hat[
+                19 + i
+            ].item()  # add in groups of three avoiding repetitions
+            output[52 + i] = y_hat[22 + i].item()
+            output[56 + i] = y_hat[25 + i].item()
 
-    for i in range(3):
-        output[48 + i] = y_hat[
-            19 + i
-        ].item()  # add in groups of three avoiding repetitions
-        output[52 + i] = y_hat[22 + i].item()
-        output[56 + i] = y_hat[25 + i].item()
+        # Symmetric apertures
+        output[47] = -output[44]
+        output[51] = -output[48]
+        output[55] = -output[52]
 
-    # Symmetric apertures
-    output[47] = -output[44]
-    output[51] = -output[48]
-    output[55] = -output[52]
+        output[59] = y_hat[28].item()
 
-    output[59] = y_hat[28].item()
+        # Begin jaw_Y
+        for i in range(4):
+            if i < 2:
+                # Same apertures opposite signs
+                output[60 + 2 * i] = y_hat[i + 29].item()
+                output[61 + 2 * i] = -y_hat[i + 29].item()
 
-    # Begin jaw_Y
-    for i in range(4):
-        if i < 2:
-            # Same apertures opposite signs
-            output[60 + 2 * i] = y_hat[i + 29].item()
-            output[61 + 2 * i] = -y_hat[i + 29].item()
+                # 4 fields with equal (and opposite) apertures
+                output[64 + 2 * i] = y_hat[31].item()
+                output[65 + 2 * i] = -y_hat[31].item()
+                output[68 + 2 * i] = y_hat[32].item()  # index 35 == thorax iso
+                output[69 + 2 * i] = -y_hat[32].item()
 
-            # 4 fields with equal (and opposite) apertures
-            output[64 + 2 * i] = y_hat[31].item()
-            output[65 + 2 * i] = -y_hat[31].item()
-            output[68 + 2 * i] = y_hat[32].item()  # index 35 == thorax iso
-            output[69 + 2 * i] = -y_hat[32].item()
+                # 2 fields with equal (and opposite) apertures
+                output[72 + 2 * i] = y_hat[31].item()
+                output[73 + 2 * i] = -y_hat[31].item()
 
-            # 2 fields with equal (and opposite) apertures
-            output[72 + 2 * i] = y_hat[31].item()
-            output[73 + 2 * i] = -y_hat[31].item()
+                # Arms apertures with opposite sign
+                output[80 + 2 * i] = y_hat[37 + i].item()
+                output[81 + 2 * i] = -y_hat[37 + i].item()
 
-            # Arms apertures with opposite sign
-            output[80 + 2 * i] = y_hat[37 + i].item()
-            output[81 + 2 * i] = -y_hat[37 + i].item()
+            output[76 + i] = y_hat[33 + i].item()  # apertures for the head
+    if y_hat.shape[0] == 32:
+        # Isocenter indexes
+        index_X = [0, 3, 6, 9, 12, 15, 18, 21, 24, 27]
+        index_Y = [1, 4, 7, 10, 13, 16, 19, 22, 25, 28]
+        output[index_X] = find_x_coord(
+            ptv_masks[patient_idx]
+        )  # x coord repeated 8 times + 2 times for iso thorax
+        output[
+            index_Y
+        ] = 100  # y coord repeated 8 times + 2 times for iso thorax, setted to 100
+        output[30] = y_hat[0].item()  # x coord right arm
+        output[
+            [31, 34]
+        ] = 100  # y coord for arms repeated twice, also constrained to 100
+        output[33] = y_hat[1].item()  # x coord left arm
 
-        output[76 + i] = y_hat[33 + i].item()  # apertures for the head
+        for z in range(2):  # first two z coords
+            output[z * 3 * 2 + 2] = y_hat[z + 2].item()
+            output[z * 3 * 2 + 5] = y_hat[z + 2].item()
+        output[20] = 0  # we skip the third ISO
+        output[23] = 0  # we skip the third ISO
+        for z in range(3):  # last three z coords we skip the third ISO
+            output[(z + 3) * 3 * 2 + 2] = y_hat[z + 4].item()
+            output[(z + 3) * 3 * 2 + 5] = y_hat[z + 4].item()
+
+        # Begin jaw_X
+        # 4 Legs + 3 Pelvi
+        for i in range(5):
+            output[36 + i] = y_hat[
+                7 + i
+            ].item()  # retrieve apertures of first 11 fields
+        output[42] = y_hat[12].item()
+        output[43] = y_hat[13].item()
+        # 3 for third iso = null + one symmetric (thus 0 )
+        for i in range(3):
+            output[44 + i] = 0
+        # 3 for chest iso = null + one symmetric (again 0 so)
+        output[48] = y_hat[14].item()
+        output[50] = y_hat[15].item()  # add in groups of three avoiding repetitions
+
+        for i in range(3):
+            # Head
+            output[52 + i] = y_hat[16 + i].item()
+            # Arms
+            output[56 + i] = y_hat[19 + i].item()
+
+        # Symmetric apertures
+        output[47] = -output[44]
+        output[51] = -output[48]
+        output[55] = -output[52]
+
+        output[59] = y_hat[22].item()
+        # Overlap fields
+        norm = aspect_ratio * ptvs[patient_idx].shape[1] / 512
+        output[41] = (y_hat[3].item() - y_hat[4].item() + 0.01) * norm + output[
+            50
+        ]  # abdom
+        output[49] = (y_hat[4].item() - y_hat[5].item() + 0.03) * norm + output[
+            54
+        ]  # chest
+
+        # Begin jaw_Y
+        for i in range(4):
+            if i < 2:
+                # Same apertures opposite signs #LEGS
+                output[60 + 2 * i] = y_hat[i + 23].item()
+                output[61 + 2 * i] = -y_hat[i + 23].item()
+
+                # 4 fields with equal (and opposite) apertures
+                output[64 + 2 * i] = y_hat[24].item()
+                output[65 + 2 * i] = -y_hat[24].item()
+                output[68 + 2 * i] = 0  # index 35 == thorax iso
+                output[69 + 2 * i] = 0
+
+                # 2 fields with equal (and opposite) apertures
+                output[72 + 2 * i] = y_hat[24].item()
+                output[73 + 2 * i] = -y_hat[24].item()
+
+                # Arms apertures with opposite sign
+                output[80 + 2 * i] = y_hat[30 + i].item()
+                output[81 + 2 * i] = -y_hat[30 + i].item()
+
+            output[76 + i] = y_hat[26 + i].item()  # apertures for the head
+    if y_hat.shape[0] == 26:
+        # Isocenter indexes
+        index_X = [
+            0,
+            3,
+            6,
+            9,
+            12,
+            15,
+            18,
+            21,
+            24,
+            27,
+        ]
+        index_Y = [1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34]
+        output[index_X] = find_x_coord(
+            ptv_masks[patient_idx]
+        )  # x coord repeated 8 times + 2 times for iso thorax
+        output[
+            index_Y
+        ] = 100  # y coord repeated 8 times + 2 times for iso thorax, setted to 0
+        output[30] = 0  # x coord right arm
+        output[33] = 0  # x coord left arm
+
+        for z in range(5):  # z coords
+            output[z * 3 * 2 + 2] = y_hat[z].item()
+            output[z * 3 * 2 + 5] = y_hat[z].item()
+        output[32] = 0  # z coord right arm
+        output[35] = 0  # z coord left arm
+
+        # Begin jaw_X
+        for i in range(5):
+            output[36 + i] = y_hat[5 + i].item()  # 4 legs+ down field 4th iso
+        for i in range(3):
+            output[42 + i] = y_hat[10 + i].item()  # 2 4th iso + down field 3rd iso
+            # head fields
+            output[52 + i] = y_hat[16 + i].item()
+            # arms fields
+            output[56 + i] = 0
+
+        # chest
+        output[46] = y_hat[13]  # third iso
+        output[48] = y_hat[14]  # chest iso down field
+        output[50] = y_hat[15]  # chest iso
+
+        # Overlap fields
+        norm = aspect_ratio * ptvs[patient_idx].shape[1] / 512
+        output[41] = (y_hat[1].item() - y_hat[2].item() + 0.01) * norm + output[
+            46
+        ]  # abdom
+        output[45] = (y_hat[2].item() - y_hat[3].item() + 0.03) * norm + output[
+            50
+        ]  # third
+        output[49] = (y_hat[3].item() - y_hat[4].item() + 0.03) * norm + output[
+            54
+        ]  # chest
+
+        # Symmetric apertures
+        # third iso
+        output[47] = -output[44]
+        # chest
+        output[51] = -output[48]
+        # head
+        output[55] = -output[52]
+        # arms
+        output[59] = 0
+
+        # Begin jaw_Y
+        for i in range(4):
+            if i < 2:
+                # Same apertures opposite signs LEGS
+                output[60 + 2 * i] = y_hat[i + 19].item()
+                output[61 + 2 * i] = -y_hat[i + 19].item()
+
+                # 4 fields with equal (and opposite) apertures
+                # Pelvi
+                output[64 + 2 * i] = y_hat[21].item()
+                output[65 + 2 * i] = -y_hat[21].item()
+                # Third iso
+                output[68 + 2 * i] = y_hat[21].item()
+                output[69 + 2 * i] = -y_hat[21].item()
+                # Chest
+                output[72 + 2 * i] = y_hat[21].item()
+                output[73 + 2 * i] = -y_hat[21].item()
+
+                # Arms apertures with opposite sign
+                output[80 + 2 * i] = 0
+                output[81 + 2 * i] = 0
+
+            output[76 + i] = y_hat[22 + i].item()  # apertures for the head
+        # output[68]=-0.5/aspect_ratio #TO DELETE
 
     return torch.Tensor(output)
 
@@ -144,6 +331,10 @@ def add_rectangle_patch(
     Returns:
         None
     """
+    if color == "r":
+        linestyle = "-"
+    else:
+        linestyle = "--"
     ax.add_patch(
         mpatches.Rectangle(
             anchor,
@@ -151,7 +342,8 @@ def add_rectangle_patch(
             height,
             angle=angle,
             rotation_point=rotation_point,
-            linewidth=1,
+            linestyle=linestyle,
+            linewidth=0.7,
             edgecolor=color,
             facecolor="none",
         )
@@ -168,6 +360,7 @@ def plot_fields(
     pix_spacing: float,
     color: str = "r",
     unit_measure: Literal["pix", "mm"] = "pix",
+    single_fig: bool = False,
 ) -> None:
     """
     Plots rectangular fields on a given Matplotlib Axes object, based on information about each field's isocenter,
@@ -192,6 +385,7 @@ def plot_fields(
         ValueError: If `unit_measure` is not "pix" or "mm".
     """
     aspect_ratio = slice_thickness / pix_spacing
+    color_flag = True
     for i, (iso, X, Y, angle) in enumerate(
         zip(
             iso_pixel,
@@ -228,6 +422,11 @@ def plot_fields(
             offset_row /= aspect_ratio
             width *= aspect_ratio
             height /= aspect_ratio
+        if single_fig:
+            if color_flag:
+                color = "r"
+            else:
+                color = "b"
         add_rectangle_patch(
             ax,
             (iso_pixel_col + offset_col, iso_pixel_row - offset_row),
@@ -237,12 +436,17 @@ def plot_fields(
             angle,
             color,
         )
+        if single_fig:
+            color_flag = not color_flag
 
 
 def plot_img(
     patient_idx: int,
     output: torch.Tensor,
     path: str,
+    coll_angle_hat: torch.Tensor = torch.ones(
+        1
+    ),  # Default 90, if isn't important visualize the angle.
     mse: torch.Tensor = torch.tensor(0),
     single_fig: bool = False,
 ) -> None:
@@ -268,13 +472,13 @@ def plot_img(
     ------
     - The function calls the `extract_data` function to reorganize the CNN output.
     """
-    if output.shape[0] < 84:
-        output = build_output(output, patient_idx)
-
     pix_spacing_col_idx = df_patient_info.columns.get_loc(key="PixelSpacing")
     slice_tickness_col_idx = df_patient_info.columns.get_loc(key="SliceThickness")
     pix_spacing = df_patient_info.iloc[patient_idx, pix_spacing_col_idx]
     slice_thickness = df_patient_info.iloc[patient_idx, slice_tickness_col_idx]
+    aspect_ratio = slice_thickness / pix_spacing
+    if output.shape[0] < 84:
+        output = build_output(output, patient_idx, aspect_ratio)
 
     isocenters_hat, jaws_X_pix_hat, jaws_Y_pix_hat = extract_original_data(output)
 
@@ -290,21 +494,26 @@ def plot_img(
     isocenters_hat = isocenters_hat[np.newaxis]
     jaws_X_pix_hat = jaws_X_pix_hat[np.newaxis]
     jaws_Y_pix_hat = jaws_Y_pix_hat[np.newaxis]
+    angles = 90 * np.ones(12)
+    if round(torch.sigmoid(coll_angle_hat).item()) == 1:
+        angles[0] = 355
+        angles[1] = 5
 
+    if MODEL != "body":
+        angles[10] = 355
+        angles[11] = 5
     processing_output = Processing(
         [processing_raw.masks[patient_idx]],  # resized mask
         isocenters_hat,
         jaws_X_pix_hat,
         jaws_Y_pix_hat,
-        coll_angles[patient_idx],
+        angles,
     )
 
     # Retrieve information of the original shape
     processing_output.original_sizes = [processing_raw.original_sizes[patient_idx]]
 
-    processing_output.inverse_scale()
-    processing_output.inverse_rotate_90()
-    processing_output.inverse_resize()
+    processing_output.inverse_trasform()
     processing_raw.inverse_rotate_90()
     processing_raw.inverse_resize()
 
@@ -363,7 +572,7 @@ def single_figure_plot(
         processing_output.isocenters_pix[0, :, 2],
         processing_output.isocenters_pix[0, :, 0],
         color="red",
-        s=10,
+        s=7,
     )
     plot_fields(
         plt.gca(),
@@ -380,7 +589,7 @@ def single_figure_plot(
         processing_raw.isocenters_pix[patient_idx, :, 2],
         processing_raw.isocenters_pix[patient_idx, :, 0],
         color="blue",
-        s=10,
+        s=7,
     )
     plot_fields(
         plt.gca(),
@@ -441,7 +650,7 @@ def separate_plots(
         processing_output.isocenters_pix[0, :, 2],
         processing_output.isocenters_pix[0, :, 0],
         color="red",
-        s=10,
+        s=7,
     )
     plot_fields(
         plt.gca(),
@@ -451,6 +660,7 @@ def separate_plots(
         processing_output.coll_angles,
         slice_thickness,
         pix_spacing,
+        single_fig=True,
     )
     plt.title(f"MSE loss: {mse}")
     predict_img_path = os.path.join(path, "predict_img")
@@ -467,7 +677,7 @@ def separate_plots(
         processing_raw.isocenters_pix[patient_idx, :, 2],
         processing_raw.isocenters_pix[patient_idx, :, 0],
         color="blue",
-        s=10,
+        s=7,
     )
     plot_fields(
         plt.gca(),
@@ -478,6 +688,7 @@ def separate_plots(
         slice_thickness,
         pix_spacing,
         "b",
+        single_fig=True,
     )
 
     real_img_path = os.path.join(path, "real_img")
@@ -600,7 +811,7 @@ if __name__ == "__main__":
     )
 
     test_build_output = torch.arange(1, 43)  # range [1, 42] step=1, new output shape
-    reconstructed_output = build_output(test_build_output, patient_idx)
+    reconstructed_output = build_output(test_build_output, patient_idx, 4.26)
     assert reconstructed_output.shape[0] == 84
 
     path = "test"

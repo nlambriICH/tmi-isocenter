@@ -132,7 +132,7 @@ class Processing:
         isos_kps_img_rot3D = np.zeros(
             shape=(self.num_patients, self.iso_per_patient, 3)
         )
-        rot = iaa.Rot90(k=1, keep_size=False)
+        rot = iaa.Rot90(k=-1, keep_size=False)
 
         for i, (mask2d, iso_pix) in enumerate(zip(self.masks, self.isocenters_pix)):
             iso_kps_img = KeypointsOnImage(
@@ -243,7 +243,7 @@ class Processing:
         isos_kps_img_rot3D = np.zeros(
             shape=(self.num_patients, self.iso_per_patient, 3)
         )
-        rot = iaa.Rot90(k=-1, keep_size=False)
+        rot = iaa.Rot90(k=1, keep_size=False)
 
         for i, (mask2d, iso_pix) in enumerate(zip(self.masks, self.isocenters_pix)):
             # Swap columns to original dicom coordinate system
@@ -320,7 +320,7 @@ class Processing:
             aug = iaa.Sequential(
                 [
                     iaa.Resize(size={"height": 512, "width": width_resize}),
-                    iaa.Rot90(k=1, keep_size=False),
+                    iaa.Rot90(k=-1, keep_size=False),
                 ]
             )
             # Keypoint x: column-wise == dicom-z, keypoint y: row-wise == dicom-x
@@ -376,7 +376,7 @@ class Processing:
         ):
             aug = iaa.Sequential(
                 [
-                    iaa.Rot90(k=-1, keep_size=False),
+                    iaa.Rot90(k=1, keep_size=False),
                     iaa.Resize(size={"height": 512, "width": width_resize}),
                 ]
             )
