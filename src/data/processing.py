@@ -1,5 +1,4 @@
 import numpy as np
-import pandas as pd
 import imgaug.augmenters as iaa
 from imgaug.augmentables import Keypoint, KeypointsOnImage
 from src.utils.field_geometry_transf import get_zero_row_idx

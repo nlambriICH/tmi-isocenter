@@ -1,11 +1,8 @@
 """Lightning module for CNN training"""
-from src.modules.lightning_cnn import LitCNN
-import torch.nn.functional as F
 import torch
 from torch import nn
-from torchmetrics.classification import BinaryAccuracy
-from src.models.cnn import CNN
-from src.config.constants import CLASSIFICATION
+import torch.nn.functional as F
+from src.modules.lightning_cnn import LitCNN
 
 
 class BodyCNN(LitCNN):  # pylint: disable=too-many-ancestors
@@ -28,25 +25,16 @@ class BodyCNN(LitCNN):  # pylint: disable=too-many-ancestors
             cnn (torch.nn.Module): CNN module with multi-head output for keypoints regression
                 and angle classification
         """
-        super().__init__()
-        self.example_input_array = torch.Tensor(
-            32, 3, 512, 512
-        )  # display the intermediate input and output sizes of layers when trainer.fit() is called
-        self.flag = (CLASSIFICATION,)
-        self.cnn = CNN(
-            filters,
-            output,
-            self.flag,
-            activation,
+        super().__init__(
+            learning_rate=learning_rate,
+            mse_loss_weight=mse_loss_weight,
+            bcelogits_loss_weight=bcelogits_loss_weight,
+            weight=weight,
+            activation=activation,
+            focus_on=focus_on,
+            filters=filters,
+            output=output,
         )
-        self.accuracy = BinaryAccuracy()
-        self.learning_rate = learning_rate
-        self.train_mse_weight = mse_loss_weight
-        self.bcelogits_loss_weight = bcelogits_loss_weight
-        self.weights = torch.ones(output)
-        self.weights[focus_on] = weight
-        self.save_hyperparameters()
-        self.filters = filters
 
     def training_step(  # pylint: disable=arguments-differ
         self, batch: list[torch.Tensor], batch_idx: int
@@ -72,7 +60,7 @@ class BodyCNN(LitCNN):  # pylint: disable=too-many-ancestors
         y_reg = y_reg.view(y_reg.size(0), -1)  # shape=(N_batch, N_out)
         y_cls = y_cls.view(-1, 1)  # shape=(N_batch, 1)
 
-        if not self.flag:
+        if not self.classif:
             y_reg_hat, y_cls_hat = self.cnn(x)
             train_mse_loss = self.weighted_mse_loss(y_reg_hat, y_reg)
             train_bcelogits_loss = F.binary_cross_entropy_with_logits(y_cls_hat, y_cls)
@@ -112,7 +100,7 @@ class BodyCNN(LitCNN):  # pylint: disable=too-many-ancestors
         y_reg = y_reg.view(1, -1)  # shape=(1, N_out)
         y_cls = y_cls.view(1, -1)  # shape=(1, 1)
 
-        if not self.flag:
+        if not self.classif:
             y_reg_hat, y_cls_hat = self.cnn(x)
             val_mse_loss = self.weighted_mse_loss(y_reg_hat, y_reg)
             self.accuracy(torch.sigmoid(y_cls_hat), y_cls)

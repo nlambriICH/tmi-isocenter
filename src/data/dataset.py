@@ -36,7 +36,7 @@ class Dataset:
         self.df_patient_info = pd.read_csv(r"data\patient_info.csv")
 
     def normalize_ptv(self, background=-1) -> np.ndarray:
-        """Normalize the 3D masks of the PTV (Planning Target Volume).
+        """Normalize the channel correspondin to the PTV HU density.
 
         Parameters:
             self (object): The instance of the class containing the masks.
@@ -46,8 +46,8 @@ class Dataset:
             np.ndarray: A numpy array containing the normalized masks.
 
         Description:
-            This function normalizes the 3D masks of the PTV by applying a min-max normalization
-            to each hu mask. The normalization is performed independently on each mask, ensuring
+            This function normalizes the HU mask of the PTV by applying a min-max normalization.
+            The normalization is performed independently on each mask, ensuring
             that the minimum value of each mask becomes 0 and the maximum value becomes 1.
             If the `background` parameter is provided, the normalization is performed by considering
             only the non-zero values within each mask, with the background value specified.

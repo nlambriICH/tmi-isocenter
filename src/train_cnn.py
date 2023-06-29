@@ -33,11 +33,6 @@ if __name__ == "__main__":
     train_index, val_idx, test_index = dataset.train_val_test_split()
     train_index = dataset.augment_train()
     masks_aug, y_reg, y_cls = dataset.get_data_Xy()
-    logger = TensorBoardLogger(
-        "lightning_logs",
-        name=name,
-        log_graph=True,
-    )
 
     (
         masks_train,
@@ -102,7 +97,11 @@ if __name__ == "__main__":
     )
 
     trainer = pl.Trainer(
-        logger=logger,  # pyright: ignore[reportGeneralTypeIssues]
+        logger=TensorBoardLogger(
+            "lightning_logs",
+            name=name,
+            log_graph=True,
+        ),  # pyright: ignore[reportGeneralTypeIssues]
         callbacks=[  # pyright: ignore[reportGeneralTypeIssues]
             EarlyStopping(monitor="val_mse_loss", mode="min", patience=7),
             ModelSummary(
