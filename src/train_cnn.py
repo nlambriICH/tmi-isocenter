@@ -31,6 +31,7 @@ if __name__ == "__main__":
         name = "whole_model"
 
     train_index, val_idx, test_index = dataset.train_val_test_split()
+    train_index = dataset.augment_train()
     masks_aug, y_reg, y_cls = dataset.get_data_Xy()
     logger = TensorBoardLogger(
         "lightning_logs",
@@ -96,19 +97,20 @@ if __name__ == "__main__":
                 0:test_len
             ],  # it switches if the dataset changes: [0:11] or [0:3]
         ),
+        shuffle=True,
         num_workers=1,
     )
 
     trainer = pl.Trainer(
         logger=logger,  # pyright: ignore[reportGeneralTypeIssues]
         callbacks=[  # pyright: ignore[reportGeneralTypeIssues]
-            EarlyStopping(monitor="val_mse_loss", mode="min", patience=10),
+            EarlyStopping(monitor="val_mse_loss", mode="min", patience=7),
             ModelSummary(
                 max_depth=-1
             ),  # print the weights summary of the model when trainer.fit() is called
             LearningRateMonitor(logging_interval="epoch"),
         ],
-        max_epochs=100,
+        max_epochs=50,
         log_every_n_steps=1,
     )
     trainer.fit(
