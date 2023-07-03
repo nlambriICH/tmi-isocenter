@@ -1,5 +1,5 @@
 """Dataset utility functions"""
-from typing import Literal
+import random
 import numpy as np
 import pandas as pd
 import imgaug.augmenters as iaa
@@ -25,6 +25,9 @@ class Augmentation:
         self.angles = np.load(r"data\interim\angles.npy")  # shape=(N, 12)
         self.angle_class = np.where(self.angles[:, 0] == 90, 0.0, 1.0)  # shape=(N,)
         self.df_patient_info = pd.read_csv(r"data\patient_info.csv")
+        self.train_affine = self.train_indexes
+        # Define the number of images you want to augment
+        self.num_images_to_augment = 100
 
     def flip_translate_augmentation(
         self,
@@ -37,45 +40,67 @@ class Augmentation:
         pd.DataFrame,
         np.ndarray,
     ]:
-        masks_nnc = np.transpose(self.train_masks, (0, 2, 3, 1))
+        """Apply flip, translate, elastic augmentations to a subset of images.
+
+        Returns:
+            A tuple containing the augmented data:
+            - masks: Augmented masks (np.ndarray)
+            - isocenters_pix: Augmented isocenter positions (np.ndarray)
+            - jaws_X_pix: Augmented jaw X positions (np.ndarray)
+            - jaws_Y_pix: Augmented jaw Y positions (np.ndarray)
+            - angles: Augmented angles (np.ndarray)
+            - df_patient_info_aug: Augmented patient info DataFrame (pd.DataFrame)
+            - train_affine: Augmented train affine (np.ndarray)
+        """
+        masks_nnc = np.transpose(self.masks, (0, 2, 3, 1))
+        # Create the class processing to return at the original measures
         inverse_scaling_class = Processing(
             list(masks_nnc),
-            self.train_iso,
+            self.isocenters_pix,
             self.jaws_X_pix,
             self.jaws_Y_pix,
             self.angles,
         )
         inverse_scaling_class.inverse_scale()
+        # Saving the original isocenter positions
         original_dim_iso = inverse_scaling_class.isocenters_pix
         masks_aug = np.zeros(
             shape=(
-                self.num_patients,
+                self.num_images_to_augment,
                 self.masks[0].shape[0],
                 self.masks[0].shape[1],
                 self.masks[0].shape[2],
             )
         )
         isos_kps_img_augm3D = np.zeros(
-            shape=(self.num_patients, self.isocenters_pix[0].shape[0], 3)
+            shape=(self.num_images_to_augment, self.isocenters_pix[0].shape[0], 3)
         )
-        seq = iaa.Sequential(
-            [
-                iaa.Fliplr(
-                    p=1,
-                    seed=42,
-                ),
-                iaa.Affine(translate_percent={"x": (-0.1, 0.1), "y": (-0.1, 0.1)}),
-                iaa.ElasticTransformation(alpha=100, sigma=10),
-                iaa.Cutout(
-                    nb_iterations=(2, 5),
-                    size=0.1,
-                    squared=False,
-                    fill_mode="constant",
-                    cval=0,
-                ),
-            ]
+        # Get the indices of the images to be augmented
+        image_indices = random.choices(
+            list(self.train_indexes), k=self.num_images_to_augment
         )
-        for i, (mask2d, iso_pix) in enumerate(zip(self.train_masks, original_dim_iso)):
+
+        # Array of trasformations from which we sample
+        augment = [
+            iaa.Fliplr(
+                p=1,
+                seed=42,
+            ),
+            iaa.Affine(translate_percent={"x": (-0.1, 0.1), "y": (-0.1, 0.1)}),
+            iaa.ElasticTransformation(alpha=100, sigma=10),
+            iaa.Cutout(
+                nb_iterations=(2, 5),
+                size=0.1,
+                squared=False,
+                fill_mode="constant",
+                cval=0,
+            ),
+        ]
+        for i, aug_index in enumerate(image_indices):
+            augment_choice = random.sample(population=augment, k=3)
+            seq = iaa.Sequential(augment_choice)
+            mask2d = self.masks[aug_index]
+            iso_pix = original_dim_iso[aug_index]
             iso_kps_img = KeypointsOnImage(
                 [Keypoint(x=iso[0], y=iso[2]) for iso in iso_pix],
                 shape=mask2d.shape,
@@ -88,7 +113,6 @@ class Augmentation:
                 iso_kps_img_augm.to_xy_array()  # pyright: ignore[reportOptionalMemberAccess, reportGeneralTypeIssues]
             )
             isos_kps_temp_augm[get_zero_row_idx(iso_pix)] = 0
-            # isos_kps_temp_augm[:, [1, 0]] = isos_kps_temp_augm[:, [0, 1]] swap not necessary
             isos_kps_img_augm3D[i] = np.insert(
                 isos_kps_temp_augm, 1, iso_pix[:, 1], axis=1
             )
@@ -96,40 +120,37 @@ class Augmentation:
         scaling_class = Processing(
             list(masks_nnc),
             isos_kps_img_augm3D,
-            self.jaws_X_pix,
-            self.jaws_Y_pix,
-            self.angles,
+            self.jaws_X_pix[image_indices],
+            self.jaws_Y_pix[image_indices],
+            self.angles[image_indices],
         )
         scaling_class.scale()
         isos_kps_img_augm3D = scaling_class.isocenters_pix
-        masks_affine = np.concatenate((self.masks, masks_aug), axis=0)
-        isocenters_pix_affine = np.concatenate(
+        self.train_affine = np.concatenate((self.train_affine, image_indices), axis=0)
+        self.masks = np.concatenate((self.masks, masks_aug), axis=0)
+        self.isocenters_pix = np.concatenate(
             (self.isocenters_pix, isos_kps_img_augm3D), axis=0
         )
-        jaws_X_pix_affine = np.concatenate(
-            (self.jaws_X_pix, self.jaws_X_pix[self.train_indexes]), axis=0
+        self.jaws_X_pix = np.concatenate(
+            (self.jaws_X_pix, self.jaws_X_pix[image_indices]), axis=0
         )
-        jaws_Y_pix_affine = np.concatenate(
-            (self.jaws_Y_pix, self.jaws_Y_pix[self.train_indexes]), axis=0
+        self.jaws_Y_pix = np.concatenate(
+            (self.jaws_Y_pix, self.jaws_Y_pix[image_indices]), axis=0
         )
-        angles_affine = np.concatenate(
-            (self.angles, self.angles[self.train_indexes]), axis=0
-        )
-        aug_idx = np.arange(len(self.masks), len(self.masks) + len(self.train_masks))
-        train_affine = np.concatenate((self.train_indexes, aug_idx), axis=0)
+        self.angles = np.concatenate((self.angles, self.angles[image_indices]), axis=0)
 
         # fixing dataset
-        rows_aug = self.df_patient_info.iloc[self.train_indexes]
+        rows_aug = self.df_patient_info.iloc[image_indices]
         df_patient_info_aug = self.df_patient_info.append(rows_aug)
         # TO DO
         # Maybe here I can save the new df_patient, thus I can use it in Visualize
         # To print the train images augmented
         return (
-            masks_affine,
-            isocenters_pix_affine,
-            jaws_X_pix_affine,
-            jaws_Y_pix_affine,
-            angles_affine,
+            self.masks,
+            self.isocenters_pix,
+            self.jaws_X_pix,
+            self.jaws_Y_pix,
+            self.angles,
             df_patient_info_aug,
-            train_affine,
+            self.train_affine,
         )
