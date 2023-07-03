@@ -493,6 +493,7 @@ def load_masks() -> list[np.ndarray]:
         "lungs_masks": r"data\raw\lungs_masks2D.npz",
         "liver_masks": r"data\raw\liver_masks2D.npz",
         "bladder_masks": r"data\raw\bladder_masks2D.npz",
+        "intestine_masks": r"data\raw\intestine_masks2D.npz",
     }
 
     loaded_masks = {}
@@ -508,6 +509,7 @@ def load_masks() -> list[np.ndarray]:
         bladder_mask,
         lungs_mask,
         liver_mask,
+        intestine_mask,
     ) in zip(
         loaded_masks["ptv_imgs"],
         loaded_masks["ptv_masks"],
@@ -515,6 +517,7 @@ def load_masks() -> list[np.ndarray]:
         loaded_masks["bladder_masks"],
         loaded_masks["lungs_masks"],
         loaded_masks["liver_masks"],
+        loaded_masks["intestine_masks"],
     ):
         channel1 = ptv_img[:, :, np.newaxis]
         channel2 = 0.3 * ptv_mask[:, :, np.newaxis]
@@ -522,7 +525,9 @@ def load_masks() -> list[np.ndarray]:
         channel4 = 0.5 * bladder_mask[:, :, np.newaxis]
         channel5 = 0.5 * lungs_mask[:, :, np.newaxis]
         channel6 = 0.5 * liver_mask[:, :, np.newaxis]
-        channel_overlap = channel3 + channel4 + channel5 + channel6
+        channel7 = intestine_mask[:, :, np.newaxis]
+        channel_overlap = channel3 + channel4 + channel5 + channel6 + channel7
+
         image = np.concatenate(
             (
                 channel1,
