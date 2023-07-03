@@ -17,7 +17,7 @@ class BodyCNN(LitCNN):  # pylint: disable=too-many-ancestors
         activation=nn.ReLU(),
         focus_on=[1, 2],
         filters=4,
-        output=26,
+        output=25,
     ):
         """Initialize the LitCNN module
 

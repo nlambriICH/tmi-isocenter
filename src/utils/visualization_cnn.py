@@ -178,7 +178,8 @@ def build_output(
                 output[81 + 2 * i] = -y_hat[30 + i].item()
 
             output[76 + i] = y_hat[26 + i].item()  # apertures for the head
-    if y_hat.shape[0] == 26:
+    if y_hat.shape[0] == 25:
+        norm = aspect_ratio * ptvs[patient_idx].shape[1] / 512
         # Isocenter indexes
         index_X = [
             0,
@@ -202,38 +203,35 @@ def build_output(
         output[30] = 0  # x coord right arm
         output[33] = 0  # x coord left arm
 
-        for z in range(5):  # z coords
+        for z in range(2):  # z coords
             output[z * 3 * 2 + 2] = y_hat[z].item()
             output[z * 3 * 2 + 5] = y_hat[z].item()
+            output[(z + 3) * 3 * 2 + 2] = y_hat[z + 2].item()
+            output[(z + 3) * 3 * 2 + 5] = y_hat[z + 2].item()
+        output[14] = (output[11] + output[20]) / 2
+        output[17] = (output[11] + output[20]) / 2
         output[32] = 0  # z coord right arm
         output[35] = 0  # z coord left arm
 
         # Begin jaw_X
         for i in range(5):
-            output[36 + i] = y_hat[5 + i].item()  # 4 legs+ down field 4th iso
+            output[36 + i] = y_hat[4 + i].item()  # 4 legs+ down field 4th iso
         for i in range(3):
-            output[42 + i] = y_hat[10 + i].item()  # 2 4th iso + down field 3rd iso
+            output[42 + i] = y_hat[9 + i].item()  # 2 4th iso + down field 3rd iso
             # head fields
-            output[52 + i] = y_hat[16 + i].item()
+            output[52 + i] = y_hat[15 + i].item()
             # arms fields
             output[56 + i] = 0
 
         # chest
-        output[46] = y_hat[13]  # third iso
-        output[48] = y_hat[14]  # chest iso down field
-        output[50] = y_hat[15]  # chest iso
+        output[46] = y_hat[12]  # third iso
+        output[48] = y_hat[13]  # chest iso down field
+        output[50] = y_hat[14]  # chest iso
 
         # Overlap fields
-        norm = aspect_ratio * ptvs[patient_idx].shape[1] / 512
-        output[41] = (y_hat[1].item() - y_hat[2].item() + 0.01) * norm + output[
-            46
-        ]  # abdom
-        output[45] = (y_hat[2].item() - y_hat[3].item() + 0.03) * norm + output[
-            50
-        ]  # third
-        output[49] = (y_hat[3].item() - y_hat[4].item() + 0.03) * norm + output[
-            54
-        ]  # chest
+        output[41] = (output[8] - output[14] + 0.01) * norm + output[46]  # abdom
+        output[45] = (output[14] - output[20] + 0.03) * norm + output[50]  # third
+        output[49] = (output[20] - output[26] + 0.03) * norm + output[54]  # chest
 
         # Symmetric apertures
         # third iso
@@ -249,25 +247,25 @@ def build_output(
         for i in range(4):
             if i < 2:
                 # Same apertures opposite signs LEGS
-                output[60 + 2 * i] = y_hat[i + 19].item()
-                output[61 + 2 * i] = -y_hat[i + 19].item()
+                output[60 + 2 * i] = y_hat[i + 18].item()
+                output[61 + 2 * i] = -y_hat[i + 18].item()
 
                 # 4 fields with equal (and opposite) apertures
                 # Pelvi
-                output[64 + 2 * i] = y_hat[21].item()
-                output[65 + 2 * i] = -y_hat[21].item()
+                output[64 + 2 * i] = y_hat[20].item()
+                output[65 + 2 * i] = -y_hat[20].item()
                 # Third iso
-                output[68 + 2 * i] = y_hat[21].item()
-                output[69 + 2 * i] = -y_hat[21].item()
+                output[68 + 2 * i] = y_hat[20].item()
+                output[69 + 2 * i] = -y_hat[20].item()
                 # Chest
-                output[72 + 2 * i] = y_hat[21].item()
-                output[73 + 2 * i] = -y_hat[21].item()
+                output[72 + 2 * i] = y_hat[20].item()
+                output[73 + 2 * i] = -y_hat[20].item()
 
                 # Arms apertures with opposite sign
                 output[80 + 2 * i] = 0
                 output[81 + 2 * i] = 0
 
-            output[76 + i] = y_hat[22 + i].item()  # apertures for the head
+            output[76 + i] = y_hat[21 + i].item()  # apertures for the head
         # output[68]=-0.5/aspect_ratio #TO DELETE
 
     return torch.Tensor(output)
