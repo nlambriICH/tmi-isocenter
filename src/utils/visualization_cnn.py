@@ -232,7 +232,7 @@ def build_output(
         # Overlap fields
         output[41] = (output[8] - output[14] + 0.01) * norm + output[46]  # abdom
         output[45] = (output[14] - output[20] + 0.03) * norm + output[50]  # third
-        output[49] = (output[20] - output[26] + 0.03) * norm + output[54]  # chest
+        output[49] = (output[20] - output[26] + 0.02) * norm + output[54]  # chest
 
         # Symmetric apertures
         # third iso
@@ -514,10 +514,17 @@ def plot_img(
     # Retrieve information of the original shape
     processing_output.original_sizes = [processing_raw.original_sizes[patient_idx]]
     processing_output.inverse_trasform()
+
     start_value, x_right, y_right, x_left, y_left = find_fields_coor(
         patient_idx, ptv_masks[patient_idx], processing_output.isocenters_pix[0]
     )
-
+    if (
+        ((x_left - x_right) / 10)
+        < (processing_output.isocenters_pix[0][2, 2] - x_left)
+        < (x_left + x_right) / 10
+    ):
+        processing_output.isocenters_pix[0][2, 2] = x_left - 10
+        processing_output.isocenters_pix[0][3, 2] = x_left - 10
     if x_left < processing_output.isocenters_pix[0][2, 2] < x_right:
         processing_output.jaws_X_pix[0][2, 0] = (
             (x_left - processing_output.isocenters_pix[0][2, 2] + 1) * aspect_ratio / 2
@@ -525,17 +532,60 @@ def plot_img(
         processing_output.jaws_X_pix[0][3, 1] = (
             (x_right - processing_output.isocenters_pix[0][2, 2] - 1) * aspect_ratio / 2
         )
-    if processing_output.isocenters_pix[0][2, 2] < x_left:
-        processing_output.jaws_X_pix[0][2, 1] = (
-            x_right - processing_output.isocenters_pix[0][2, 2] - 1
-        ) * aspect_ratio
-        if MODEL == "body":
-            processing_output.jaws_X_pix[0][5, 0] = (
-                x_left - processing_output.isocenters_pix[0][4, 2] + 1
-            ) * aspect_ratio
+
+        x_fields_iso_out_of_backbone(aspect_ratio, processing_output, x_right, x_left)
+        # splitting the distance between the two last iso.
+        translation = (
+            1
+            / 2
+            * (
+                (
+                    processing_output.isocenters_pix[0][2, 2]
+                    + processing_output.jaws_X_pix[0][3, 0] / aspect_ratio
+                )
+                - (
+                    processing_output.isocenters_pix[0][0, 2]
+                    + processing_output.jaws_X_pix[0][1, 1] / aspect_ratio
+                )
+                + (
+                    processing_output.isocenters_pix[0][4, 2]
+                    + processing_output.jaws_X_pix[0][5, 0] / aspect_ratio
+                )
+                - (
+                    processing_output.isocenters_pix[0][2, 2]
+                    + processing_output.jaws_X_pix[0][3, 1] / aspect_ratio
+                )
+            )
+        )
+
+        processing_output.isocenters_pix[0][2, 2] = (
+            processing_output.isocenters_pix[0][0, 2]
+            + processing_output.jaws_X_pix[0][1, 1] / aspect_ratio
+            + translation
+            - processing_output.jaws_X_pix[0][3, 0] / aspect_ratio
+        )
+        processing_output.isocenters_pix[0][3, 2] = (
+            processing_output.isocenters_pix[0][0, 2]
+            + processing_output.jaws_X_pix[0][1, 1] / aspect_ratio
+            + translation
+            - processing_output.jaws_X_pix[0][3, 0] / aspect_ratio
+        )
+        processing_output.isocenters_pix[0][4, 2] = (
+            processing_output.isocenters_pix[0][3, 2]
+            + processing_output.isocenters_pix[0][6, 2]
+        ) / 2
+        processing_output.isocenters_pix[0][5, 2] = (
+            processing_output.isocenters_pix[0][3, 2]
+            + processing_output.isocenters_pix[0][6, 2]
+        ) / 2
+        x_fields_iso_out_of_backbone(aspect_ratio, processing_output, x_right, x_left)
+    if processing_output.isocenters_pix[0][2, 2] > x_right:
         if MODEL == "arms":
-            processing_output.jaws_X_pix[5, 0] = (
-                x_left - processing_output.isocenters_pix[0][6, 2] + 1
+            processing_output.jaws_X_pix[0][0, 1] = (
+                x_right - processing_output.isocenters_pix[0][0, 2] - 1
+            ) * aspect_ratio
+            processing_output.jaws_X_pix[0][3, 0] = (
+                (x_left - processing_output.isocenters_pix[0][2, 2]) + 1
             ) * aspect_ratio
     processing_raw.inverse_rotate_90()
     processing_raw.inverse_resize()
@@ -559,6 +609,16 @@ def plot_img(
             slice_thickness,  # pyright: ignore[reportGeneralTypeIssues]
             mse=mse,
         )
+
+
+def x_fields_iso_out_of_backbone(aspect_ratio, processing_output, x_right, x_left):
+    if processing_output.isocenters_pix[0][2, 2] < x_left:
+        processing_output.jaws_X_pix[0][2, 1] = (
+            x_right - processing_output.isocenters_pix[0][2, 2] - 1
+        ) * aspect_ratio
+        processing_output.jaws_X_pix[0][5, 0] = (
+            x_left - processing_output.isocenters_pix[0][4, 2] + 1
+        ) * aspect_ratio
 
 
 def single_figure_plot(
