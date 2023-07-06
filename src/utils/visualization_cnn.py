@@ -6,7 +6,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from src.data.processing import Processing
-from scipy import ndimage
+from scipy import ndimage  # pyright: ignore[reportGeneralTypeIssues]
+from gradient_free_optimizers import RandomSearchOptimizer
 from src.config.constants import MODEL
 
 with np.load(r"data\raw\ptv_masks2D.npz") as npz_masks2d:
@@ -40,7 +41,7 @@ def build_output(
         index_X = [0, 3, 6, 9, 12, 15, 18, 21, 24, 27]
         index_Y = [1, 4, 7, 10, 13, 16, 19, 22, 25, 28]
         output[index_X] = find_x_coord(
-            ptv_masks[patient_idx]
+            ptvs[patient_idx]
         )  # x coord repeated 8 times + 2 times for iso thorax
         output[
             index_Y
@@ -100,7 +101,7 @@ def build_output(
         index_X = [0, 3, 6, 9, 12, 15, 18, 21, 24, 27]
         index_Y = [1, 4, 7, 10, 13, 16, 19, 22, 25, 28]
         output[index_X] = find_x_coord(
-            ptv_masks[patient_idx]
+            ptvs[patient_idx]
         )  # x coord repeated 8 times + 2 times for iso thorax
         output[
             index_Y
@@ -195,7 +196,7 @@ def build_output(
         ]
         index_Y = [1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34]
         output[index_X] = find_x_coord(
-            ptv_masks[patient_idx]
+            ptvs[patient_idx]
         )  # x coord repeated 8 times + 2 times for iso thorax
         output[
             index_Y
@@ -474,7 +475,9 @@ def plot_img(
     slice_tickness_col_idx = df_patient_info.columns.get_loc(key="SliceThickness")
     pix_spacing = df_patient_info.iloc[patient_idx, pix_spacing_col_idx]
     slice_thickness = df_patient_info.iloc[patient_idx, slice_tickness_col_idx]
-    aspect_ratio = slice_thickness / pix_spacing
+    aspect_ratio = (
+        slice_thickness / pix_spacing
+    )  # pyright: ignore[reportGeneralTypeIssues]
     if output.shape[0] < 84:
         output = build_output(output, patient_idx, aspect_ratio)
 
@@ -510,8 +513,30 @@ def plot_img(
 
     # Retrieve information of the original shape
     processing_output.original_sizes = [processing_raw.original_sizes[patient_idx]]
-
     processing_output.inverse_trasform()
+    start_value, x_right, y_right, x_left, y_left = find_fields_coor(
+        patient_idx, ptv_masks[patient_idx], processing_output.isocenters_pix[0]
+    )
+
+    if x_left < processing_output.isocenters_pix[0][2, 2] < x_right:
+        processing_output.jaws_X_pix[0][2, 0] = (
+            (x_left - processing_output.isocenters_pix[0][2, 2] + 1) * aspect_ratio / 2
+        )
+        processing_output.jaws_X_pix[0][3, 1] = (
+            (x_right - processing_output.isocenters_pix[0][2, 2] - 1) * aspect_ratio / 2
+        )
+    if processing_output.isocenters_pix[0][2, 2] < x_left:
+        processing_output.jaws_X_pix[0][2, 1] = (
+            x_right - processing_output.isocenters_pix[0][2, 2] - 1
+        ) * aspect_ratio
+        if MODEL == "body":
+            processing_output.jaws_X_pix[0][5, 0] = (
+                x_left - processing_output.isocenters_pix[0][4, 2] + 1
+            ) * aspect_ratio
+        if MODEL == "arms":
+            processing_output.jaws_X_pix[5, 0] = (
+                x_left - processing_output.isocenters_pix[0][6, 2] + 1
+            ) * aspect_ratio
     processing_raw.inverse_rotate_90()
     processing_raw.inverse_resize()
 
@@ -714,6 +739,89 @@ def find_x_coord(masks_int: np.ndarray) -> float:
     )
 
     return x_coord / masks_int.shape[0]  # Normalize the coordinate
+
+
+def find_fields_coor(
+    pat_index: int, masks_int: np.ndarray, iso: np.ndarray
+) -> tuple[int, int, int, int, int]:
+    df_patient_info = pd.read_csv(r"D:\tmi-isocenter-1\data\patient_info.csv")
+    iso_on_arms = df_patient_info["IsocenterOnArms"].to_numpy()
+    bool_arms = iso_on_arms.astype(bool)
+
+    def loss_fun(pos_new):
+        x = pos_new["x1"]
+        a1 = np.sum(masks_int[:, x])
+        score = a1
+        return -score
+
+    search_space = {
+        "x1": np.arange(0, masks_int.shape[1], 1),
+    }
+
+    def constraint_1(para):
+        a = (iso[0, 2] + iso[2, 2]) / 2 + 10
+        if bool_arms[pat_index] == True:
+            a = (iso[0, 2] + iso[2, 2]) / 2
+        b = (iso[2, 2] + iso[6, 2]) / 2
+        return para["x1"] > a and para["x1"] < b
+        # put one or more constraints inside a list
+
+    constraints_list = [constraint_1]
+    # pass list of constraints to the optimizer
+    opt = RandomSearchOptimizer(search_space, constraints=constraints_list)
+    opt.search(loss_fun, n_iter=100)
+
+    start_value = opt.best_value[0]
+    min = 512
+    backbone = int(find_x_coord(ptvs[pat_index]) * masks_int.shape[0])
+    y_pixels = np.concatenate(
+        (
+            np.arange(backbone - 115, backbone - 50),
+            np.arange(backbone + 50, backbone + 115),
+        )
+    )
+    for j in y_pixels:
+        count = 0
+        for i in range(40):
+            if masks_int[j, opt.best_value[0] + i] == False:
+                count += 1
+            else:
+                if (
+                    masks_int[j, opt.best_value[0] + i]
+                    != masks_int[j, opt.best_value[0] + i + 1]
+                ):
+                    count = 1000
+                if count == 0:
+                    count = 1000
+        if min > count:
+            min = count
+            min_pos_x_RU = opt.best_value[0] + count
+            min_pos_y_RU = j
+    R_pos_x = min_pos_x_RU  # pyright: ignore[reportUnboundVariable]
+    R_pos_y = min_pos_y_RU  # pyright: ignore[reportUnboundVariable]
+    min = 512
+    for j in y_pixels:
+        count = 0
+        for i in range(40):
+            if masks_int[j, opt.best_value[0] - i] == False:
+                count += 1
+            else:
+                if (
+                    masks_int[j, opt.best_value[0] - i]
+                    != masks_int[j, opt.best_value[0] - i - 1]
+                ):
+                    count = 1000
+                    break
+                if count == 0:
+                    count = 1000
+        if min > count:
+            min = count
+            min_pos_x_LU = opt.best_value[0] - count
+            min_pos_y_LU = j
+    L_pos_x = min_pos_x_LU  # pyright: ignore[reportUnboundVariable]
+    L_pos_y = min_pos_y_LU  # pyright: ignore[reportUnboundVariable]
+
+    return start_value, R_pos_x, R_pos_y, L_pos_x, L_pos_y  # Normalize the coordinate
 
 
 if __name__ == "__main__":
