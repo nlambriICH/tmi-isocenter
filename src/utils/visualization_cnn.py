@@ -10,878 +10,930 @@ from scipy import ndimage  # pyright: ignore[reportGeneralTypeIssues]
 from gradient_free_optimizers import RandomSearchOptimizer
 from src.config.constants import MODEL
 
-with np.load(r"data\raw\ptv_masks2D.npz") as npz_masks2d:
-    ptv_masks = list(npz_masks2d.values())
-with np.load(r"data\raw\ptv_imgs2D.npz") as npz_masks2d:
-    ptvs = list(npz_masks2d.values())
-isocenters_pix = np.load(r"data\raw\isocenters_pix.npy")
-jaws_X_pix = np.load(r"data\raw\jaws_X_pix.npy")
-jaws_Y_pix = np.load(r"data\raw\jaws_Y_pix.npy")
-coll_angles = np.load(r"data\raw\angles.npy")
-df_patient_info = pd.read_csv(r"data\patient_info.csv")
-if MODEL == "arms":
-    iso_on_arms = df_patient_info["IsocenterOnArms"].to_numpy()
-    bool_arms = iso_on_arms.astype(bool)
 
-elif MODEL == "body":
-    iso_on_arms = df_patient_info["IsocenterOnArms"].to_numpy()
-    bool_arms = ~iso_on_arms.astype(bool)
+class Visualize:
+    """Visualization class to visualize and optimize model's output"""
 
-
-pix_spacing_col_idx = df_patient_info.columns.get_loc(key="PixelSpacing")
-slice_tickness_col_idx = df_patient_info.columns.get_loc(key="SliceThickness")
-
-
-def build_output(
-    y_hat: torch.Tensor, patient_idx: int, aspect_ratio: float
-) -> torch.Tensor:
-    output = np.zeros(shape=(84))
-    if y_hat.shape[0] == 39:
-        # Isocenter indexes
-        index_X = [0, 3, 6, 9, 12, 15, 18, 21, 24, 27]
-        index_Y = [1, 4, 7, 10, 13, 16, 19, 22, 25, 28]
-        output[index_X] = find_x_coord(
-            ptvs[patient_idx]
-        )  # x coord repeated 8 times + 2 times for iso thorax
-        output[
-            index_Y
-        ] = 100  # y coord repeated 8 times + 2 times for iso thorax, setted to 0
-        output[30] = y_hat[0].item()  # x coord right arm
-        output[[31, 34]] = 100  # y coord for arms repeated twice, also constrained to 0
-        output[33] = y_hat[1].item()  # x coord left arm
-
-        for z in range(6):  # z coords
-            output[z * 3 * 2 + 2] = y_hat[z + 2].item()
-            output[z * 3 * 2 + 5] = y_hat[z + 2].item()
-
-        # Begin jaw_X
-        for i in range(11):
-            output[36 + i] = y_hat[
-                8 + i
-            ].item()  # retrieve apertures of first 11 fields
-
-        for i in range(3):
-            output[48 + i] = y_hat[
-                19 + i
-            ].item()  # add in groups of three avoiding repetitions
-            output[52 + i] = y_hat[22 + i].item()
-            output[56 + i] = y_hat[25 + i].item()
-
-        # Symmetric apertures
-        output[47] = -output[44]
-        output[51] = -output[48]
-        output[55] = -output[52]
-
-        output[59] = y_hat[28].item()
-
-        # Begin jaw_Y
-        for i in range(4):
-            if i < 2:
-                # Same apertures opposite signs
-                output[60 + 2 * i] = y_hat[i + 29].item()
-                output[61 + 2 * i] = -y_hat[i + 29].item()
-
-                # 4 fields with equal (and opposite) apertures
-                output[64 + 2 * i] = y_hat[31].item()
-                output[65 + 2 * i] = -y_hat[31].item()
-                output[68 + 2 * i] = y_hat[32].item()  # index 35 == thorax iso
-                output[69 + 2 * i] = -y_hat[32].item()
-
-                # 2 fields with equal (and opposite) apertures
-                output[72 + 2 * i] = y_hat[31].item()
-                output[73 + 2 * i] = -y_hat[31].item()
-
-                # Arms apertures with opposite sign
-                output[80 + 2 * i] = y_hat[37 + i].item()
-                output[81 + 2 * i] = -y_hat[37 + i].item()
-
-            output[76 + i] = y_hat[33 + i].item()  # apertures for the head
-    if y_hat.shape[0] == 32:
-        # Isocenter indexes
-        index_X = [0, 3, 6, 9, 12, 15, 18, 21, 24, 27]
-        index_Y = [1, 4, 7, 10, 13, 16, 19, 22, 25, 28]
-        output[index_X] = find_x_coord(
-            ptvs[patient_idx]
-        )  # x coord repeated 8 times + 2 times for iso thorax
-        output[
-            index_Y
-        ] = 100  # y coord repeated 8 times + 2 times for iso thorax, setted to 100
-        output[30] = y_hat[0].item()  # x coord right arm
-        output[
-            [31, 34]
-        ] = 100  # y coord for arms repeated twice, also constrained to 100
-        output[33] = y_hat[1].item()  # x coord left arm
-
-        for z in range(2):  # first two z coords
-            output[z * 3 * 2 + 2] = y_hat[z + 2].item()
-            output[z * 3 * 2 + 5] = y_hat[z + 2].item()
-        output[20] = 0  # we skip the third ISO
-        output[23] = 0  # we skip the third ISO
-        for z in range(3):  # last three z coords we skip the third ISO
-            output[(z + 3) * 3 * 2 + 2] = y_hat[z + 4].item()
-            output[(z + 3) * 3 * 2 + 5] = y_hat[z + 4].item()
-
-        # Begin jaw_X
-        # 4 Legs + 3 Pelvi
-        for i in range(5):
-            output[36 + i] = y_hat[
-                7 + i
-            ].item()  # retrieve apertures of first 11 fields
-        output[42] = y_hat[12].item()
-        output[43] = y_hat[13].item()
-        # 3 for third iso = null + one symmetric (thus 0 )
-        for i in range(3):
-            output[44 + i] = 0
-        # 3 for chest iso = null + one symmetric (again 0 so)
-        output[48] = y_hat[14].item()
-        output[50] = y_hat[15].item()  # add in groups of three avoiding repetitions
-
-        for i in range(3):
-            # Head
-            output[52 + i] = y_hat[16 + i].item()
-            # Arms
-            output[56 + i] = y_hat[19 + i].item()
-
-        # Symmetric apertures
-        output[47] = -output[44]
-        output[51] = -output[48]
-        output[55] = -output[52]
-
-        output[59] = y_hat[22].item()
-        # Overlap fields
-        norm = aspect_ratio * ptvs[patient_idx].shape[1] / 512
-        output[41] = (y_hat[3].item() - y_hat[4].item() + 0.01) * norm + output[
-            50
-        ]  # abdom
-        output[49] = (y_hat[4].item() - y_hat[5].item() + 0.03) * norm + output[
-            54
-        ]  # chest
-
-        # Begin jaw_Y
-        for i in range(4):
-            if i < 2:
-                # Same apertures opposite signs #LEGS
-                output[60 + 2 * i] = y_hat[i + 23].item()
-                output[61 + 2 * i] = -y_hat[i + 23].item()
-
-                # 4 fields with equal (and opposite) apertures
-                output[64 + 2 * i] = y_hat[24].item()
-                output[65 + 2 * i] = -y_hat[24].item()
-                output[68 + 2 * i] = 0  # index 35 == thorax iso
-                output[69 + 2 * i] = 0
-
-                # 2 fields with equal (and opposite) apertures
-                output[72 + 2 * i] = y_hat[24].item()
-                output[73 + 2 * i] = -y_hat[24].item()
-
-                # Arms apertures with opposite sign
-                output[80 + 2 * i] = y_hat[30 + i].item()
-                output[81 + 2 * i] = -y_hat[30 + i].item()
-
-            output[76 + i] = y_hat[26 + i].item()  # apertures for the head
-    if y_hat.shape[0] == 25:
-        norm = aspect_ratio * ptvs[patient_idx].shape[1] / 512
-        # Isocenter indexes
-        index_X = [
-            0,
-            3,
-            6,
-            9,
-            12,
-            15,
-            18,
-            21,
-            24,
-            27,
-        ]
-        index_Y = [1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34]
-        output[index_X] = find_x_coord(
-            ptvs[patient_idx]
-        )  # x coord repeated 8 times + 2 times for iso thorax
-        output[
-            index_Y
-        ] = 100  # y coord repeated 8 times + 2 times for iso thorax, setted to 0
-        output[30] = 0  # x coord right arm
-        output[33] = 0  # x coord left arm
-
-        for z in range(2):  # z coords
-            output[z * 3 * 2 + 2] = y_hat[z].item()
-            output[z * 3 * 2 + 5] = y_hat[z].item()
-            output[(z + 3) * 3 * 2 + 2] = y_hat[z + 2].item()
-            output[(z + 3) * 3 * 2 + 5] = y_hat[z + 2].item()
-        output[14] = (output[11] + output[20]) / 2
-        output[17] = (output[11] + output[20]) / 2
-        output[32] = 0  # z coord right arm
-        output[35] = 0  # z coord left arm
-
-        # Begin jaw_X
-        for i in range(5):
-            output[36 + i] = y_hat[4 + i].item()  # 4 legs+ down field 4th iso
-        for i in range(3):
-            output[42 + i] = y_hat[9 + i].item()  # 2 4th iso + down field 3rd iso
-            # head fields
-            output[52 + i] = y_hat[15 + i].item()
-            # arms fields
-            output[56 + i] = 0
-
-        # chest
-        output[46] = y_hat[12]  # third iso
-        output[48] = y_hat[13]  # chest iso down field
-        output[50] = y_hat[14]  # chest iso
-
-        # Overlap fields
-        output[41] = (output[8] - output[14] + 0.01) * norm + output[46]  # abdom
-        output[45] = (output[14] - output[20] + 0.03) * norm + output[50]  # third
-        output[49] = (output[20] - output[26] + 0.02) * norm + output[54]  # chest
-
-        # Symmetric apertures
-        # third iso
-        output[47] = -output[44]
-        # chest
-        output[51] = -output[48]
-        # head
-        output[55] = -output[52]
-        # arms
-        output[59] = 0
-
-        # Begin jaw_Y
-        for i in range(4):
-            if i < 2:
-                # Same apertures opposite signs LEGS
-                output[60 + 2 * i] = y_hat[i + 18].item()
-                output[61 + 2 * i] = -y_hat[i + 18].item()
-
-                # 4 fields with equal (and opposite) apertures
-                # Pelvi
-                output[64 + 2 * i] = y_hat[20].item()
-                output[65 + 2 * i] = -y_hat[20].item()
-                # Third iso
-                output[68 + 2 * i] = y_hat[20].item()
-                output[69 + 2 * i] = -y_hat[20].item()
-                # Chest
-                output[72 + 2 * i] = y_hat[20].item()
-                output[73 + 2 * i] = -y_hat[20].item()
-
-                # Arms apertures with opposite sign
-                output[80 + 2 * i] = 0
-                output[81 + 2 * i] = 0
-
-            output[76 + i] = y_hat[21 + i].item()  # apertures for the head
-        # output[68]=-0.5/aspect_ratio #TO DELETE
-
-    return torch.Tensor(output)
-
-
-def extract_original_data(
-    output: torch.Tensor,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """
-    Reorganize the data from a given output torch.Tensor, returns them in three separate 2D arrays.
-
-    Parameters:
-        output : torch.Tensor
-            A 1D NumPy array containing the data to be extracted. The expected length of this array is 84.
-
-    Returns:
-        tuple of 3 numpy.ndarray
-            A tuple containing the following 2D NumPy arrays:
-            - isocenters_hat: a 12x3 array containing the extracted isocenter positions in x, y, and z dimensions.
-            - jaws_X_pix_hat: a 12x2 array containing the extracted X-jaw positions in left and right directions.
-            - jaws_Y_pix_hat: a 12x2 array containing the extracted Y-jaw positions in inferior and superior directions.
-
-    Notes:
-    ------
-    - The function assumes that the `output` array is of length 84, which is the expected size of the relevant data.
-    """
-    isocenters_hat = np.zeros((12, 3))
-    jaws_X_pix_hat = np.zeros((12, 2))
-    jaws_Y_pix_hat = np.zeros((12, 2))
-    for i in range(12):
-        for j in range(3):
-            isocenters_hat[i, j] = output[3 * i + j]
-            if j < 2:
-                jaws_X_pix_hat[i, j] = output[36 + 2 * i + j]
-                jaws_Y_pix_hat[i, j] = output[60 + 2 * i + j]
-
-    return (isocenters_hat, jaws_X_pix_hat, jaws_Y_pix_hat)
-
-
-def add_rectangle_patch(
-    ax: plt.Axes,
-    anchor: tuple[float, float],
-    width: float,
-    height: float,
-    rotation_point: tuple[float, float],
-    angle: float,
-    color: str = "r",
-) -> None:
-    """
-    Adds a rectangle patch to the given Matplotlib Axes object.
-
-    Parameters:
-        ax (plt.Axes): The Matplotlib Axes object to add the rectangle patch to.
-        anchor (tuple[float, float]): The (x, y) coordinates of the bottom-left corner of the rectangle.
-        width (float): The width of the rectangle.
-        height (float): The height of the rectangle.
-        rotation_point (tuple[float, float]): The (x, y) coordinates of the point around which to rotate the rectangle.
-        angle (float): The angle (in degrees) by which to rotate the rectangle around the rotation point.
-        color (str, optional): The color of the rectangle's edge. Defaults to "r" (red).
-
-    Returns:
-        None
-    """
-    if color == "r":
-        linestyle = "-"
-    else:
-        linestyle = "--"
-    ax.add_patch(
-        mpatches.Rectangle(
-            anchor,
-            width,
-            height,
-            angle=angle,
-            rotation_point=rotation_point,
-            linestyle=linestyle,
-            linewidth=0.7,
-            edgecolor=color,
-            facecolor="none",
-        )
-    )
-
-
-def plot_fields(
-    ax: plt.Axes,
-    iso_pixel: np.ndarray,
-    jaw_X: np.ndarray,
-    jaw_Y: np.ndarray,
-    coll_angles: np.ndarray,
-    slice_thickness: float,
-    pix_spacing: float,
-    color: str = "r",
-    unit_measure: Literal["pix", "mm"] = "pix",
-    single_fig: bool = False,
-) -> None:
-    """
-    Plots rectangular fields on a given Matplotlib Axes object, based on information about each field's isocenter,
-    jaw position, and collimator angle.
-
-    Parameters:
-        ax (plt.Axes): The Matplotlib Axes object to plot the fields on.
-        iso_pixel (np.ndarray): A 2D NumPy array containing the (row, col, depth) coordinates of each field's isocenter.
-        jaw_X (np.ndarray): A 2D NumPy array containing the X positions of each field's jaw edges.
-        jaw_Y (np.ndarray): A 2D NumPy array containing the Y positions of each field's jaw edges.
-        coll_angles (np.ndarray): A 1D NumPy array containing the collimator angles of each field.
-        slice_thickness (float): The thickness of the slice being plotted (in units of the `unit_measure` parameter).
-        pix_spacing (float): The pixel spacing of the slice being plotted (in units of the `unit_measure` parameter).
-        color (str, optional): The color of the rectangle's edge. Defaults to "r" (red).
-        unit_measure (str, optional): The units of the `slice_thickness` and `pix_spacing` parameters.
-            Must be "pix" or "mm". Defaults to "pix".
-
-    Returns:
-        None
-
-    Raises:
-        ValueError: If `unit_measure` is not "pix" or "mm".
-    """
-    aspect_ratio = slice_thickness / pix_spacing
-    color_flag = True
-    for i, (iso, X, Y, angle) in enumerate(
-        zip(
-            iso_pixel,
-            jaw_X,
-            jaw_Y,
-            coll_angles,
-        )
-    ):
-        if all(iso == 0):
-            continue  # isocenter not present, skip field
-        iso_pixel_col, iso_pixel_row = iso[2], iso[0]
-        if unit_measure == "pix":
-            offset_col = Y[0]
-            offset_row = X[1]
-            width = Y[1] - Y[0]
-            height = X[1] - X[0]
-        elif unit_measure == "mm":
-            offset_col = Y[0] / slice_thickness
-            offset_row = X[1] / pix_spacing
-            width = (Y[1] - Y[0]) / slice_thickness
-            height = (X[1] - X[0]) / pix_spacing
-        else:
-            raise ValueError(
-                f'unit_measure must be "pix" or "mm" but was {unit_measure}'
-            )
-
-        if angle != 90:
-            print(
-                f"Collimator angle for field {i + 1} was {angle}°. Plotting with angle=0° for visualization"
-            )
-            angle = 0
-        elif angle == 90:
-            offset_col *= aspect_ratio
-            offset_row /= aspect_ratio
-            width *= aspect_ratio
-            height /= aspect_ratio
-        if single_fig:
-            if color_flag:
-                color = "r"
-            else:
-                color = "b"
-        add_rectangle_patch(
-            ax,
-            (iso_pixel_col + offset_col, iso_pixel_row - offset_row),
-            width,
-            height,
-            (iso_pixel_col, iso_pixel_row),
-            angle,
-            color,
-        )
-        if single_fig:
-            color_flag = not color_flag
-
-
-def plot_img(
-    patient_idx: int,
-    output: torch.Tensor,
-    path: str,
-    coll_angle_hat: torch.Tensor = torch.ones(
-        1
-    ),  # Default 90, if isn't important visualize the angle.
-    mse: torch.Tensor = torch.tensor(0),
-    single_fig: bool = False,
-) -> None:
-    """
-    Generates and saves a plot of two images for a given patient: the original image and a transformed image.
-
-    Parameters:
-        patient_idx : int
-            The index of the patient to plot.
-        output : torch.Tensor
-            A 1D NumPy array containing the output of a model for the specified patient.
-        path : str
-            The path where the plot image will be saved.
-        mse: torch.Tensor
-            MSE loss added in the figure title of separate plots.
-        single_fig : bool
-            Whether to plot ground thruth and predictions in the same image
-
-    Returns:
-        None
-
-    Notes:
-    ------
-    - The function calls the `extract_data` function to reorganize the CNN output.
-    """
-    pix_spacing_col_idx = df_patient_info.columns.get_loc(key="PixelSpacing")
-    slice_tickness_col_idx = df_patient_info.columns.get_loc(key="SliceThickness")
-    pix_spacing = df_patient_info.iloc[patient_idx, pix_spacing_col_idx]
-    slice_thickness = df_patient_info.iloc[patient_idx, slice_tickness_col_idx]
-    aspect_ratio = (
-        slice_thickness / pix_spacing
-    )  # pyright: ignore[reportGeneralTypeIssues]
-    if output.shape[0] < 84:
-        output = build_output(output, patient_idx, aspect_ratio)
-
-    isocenters_hat, jaws_X_pix_hat, jaws_Y_pix_hat = extract_original_data(output)
-
-    processing_raw = Processing(
-        ptvs,
-        isocenters_pix,
-        jaws_X_pix,
-        jaws_Y_pix,
-        coll_angles,
-    )
-    processing_raw.resize()
-    processing_raw.rotate_90()
-    isocenters_hat = isocenters_hat[np.newaxis]
-    jaws_X_pix_hat = jaws_X_pix_hat[np.newaxis]
-    jaws_Y_pix_hat = jaws_Y_pix_hat[np.newaxis]
-    angles = 90 * np.ones(12)
-    if round(torch.sigmoid(coll_angle_hat).item()) == 1:
-        angles[0] = 355
-        angles[1] = 5
-
-    if MODEL != "body":
-        angles[10] = 355
-        angles[11] = 5
-    processing_output = Processing(
-        [processing_raw.masks[patient_idx]],  # resized mask
-        isocenters_hat,
-        jaws_X_pix_hat,
-        jaws_Y_pix_hat,
-        angles,
-    )
-
-    # Retrieve information of the original shape
-    processing_output.original_sizes = [processing_raw.original_sizes[patient_idx]]
-    processing_output.inverse_trasform()
-
-    start_value, x_right, y_right, x_left, y_left = find_fields_coor(
-        patient_idx, ptv_masks[patient_idx], processing_output.isocenters_pix[0]
-    )
-    if (
-        ((x_left - x_right) / 10)
-        < (processing_output.isocenters_pix[0][2, 2] - x_left)
-        < (x_left + x_right) / 10
-    ):
-        processing_output.isocenters_pix[0][2, 2] = x_left - 10
-        processing_output.isocenters_pix[0][3, 2] = x_left - 10
-    if x_left < processing_output.isocenters_pix[0][2, 2] < x_right:
-        processing_output.jaws_X_pix[0][2, 0] = (
-            (x_left - processing_output.isocenters_pix[0][2, 2] + 1) * aspect_ratio / 2
-        )
-        processing_output.jaws_X_pix[0][3, 1] = (
-            (x_right - processing_output.isocenters_pix[0][2, 2] - 1) * aspect_ratio / 2
-        )
-
-        x_fields_iso_out_of_backbone(aspect_ratio, processing_output, x_right, x_left)
-        # splitting the distance between the two last iso.
-        translation = (
-            1
-            / 2
-            * (
-                (
-                    processing_output.isocenters_pix[0][2, 2]
-                    + processing_output.jaws_X_pix[0][3, 0] / aspect_ratio
-                )
-                - (
-                    processing_output.isocenters_pix[0][0, 2]
-                    + processing_output.jaws_X_pix[0][1, 1] / aspect_ratio
-                )
-                + (
-                    processing_output.isocenters_pix[0][4, 2]
-                    + processing_output.jaws_X_pix[0][5, 0] / aspect_ratio
-                )
-                - (
-                    processing_output.isocenters_pix[0][2, 2]
-                    + processing_output.jaws_X_pix[0][3, 1] / aspect_ratio
-                )
-            )
-        )
-
-        processing_output.isocenters_pix[0][2, 2] = (
-            processing_output.isocenters_pix[0][0, 2]
-            + processing_output.jaws_X_pix[0][1, 1] / aspect_ratio
-            + translation
-            - processing_output.jaws_X_pix[0][3, 0] / aspect_ratio
-        )
-        processing_output.isocenters_pix[0][3, 2] = (
-            processing_output.isocenters_pix[0][0, 2]
-            + processing_output.jaws_X_pix[0][1, 1] / aspect_ratio
-            + translation
-            - processing_output.jaws_X_pix[0][3, 0] / aspect_ratio
-        )
-        processing_output.isocenters_pix[0][4, 2] = (
-            processing_output.isocenters_pix[0][3, 2]
-            + processing_output.isocenters_pix[0][6, 2]
-        ) / 2
-        processing_output.isocenters_pix[0][5, 2] = (
-            processing_output.isocenters_pix[0][3, 2]
-            + processing_output.isocenters_pix[0][6, 2]
-        ) / 2
-        x_fields_iso_out_of_backbone(aspect_ratio, processing_output, x_right, x_left)
-    if processing_output.isocenters_pix[0][2, 2] > x_right:
+    def __init__(self) -> None:
+        with np.load(r"data\raw\ptv_masks2D.npz") as npz_masks2d:
+            self.ptv_masks = list(npz_masks2d.values())
+        with np.load(r"data\raw\ptv_imgs2D.npz") as npz_masks2d:
+            self.ptvs = list(npz_masks2d.values())
+        self.isocenters_pix = np.load(r"data\raw\isocenters_pix.npy")
+        self.jaws_X_pix = np.load(r"data\raw\jaws_X_pix.npy")
+        self.jaws_Y_pix = np.load(r"data\raw\jaws_Y_pix.npy")
+        self.coll_angles = np.load(r"data\raw\angles.npy")
+        self.df_patient_info = pd.read_csv(r"data\patient_info.csv")
         if MODEL == "arms":
-            processing_output.jaws_X_pix[0][0, 1] = (
-                x_right - processing_output.isocenters_pix[0][0, 2] - 1
-            ) * aspect_ratio
-            processing_output.jaws_X_pix[0][3, 0] = (
-                (x_left - processing_output.isocenters_pix[0][2, 2]) + 1
-            ) * aspect_ratio
-    processing_raw.inverse_rotate_90()
-    processing_raw.inverse_resize()
+            iso_on_arms = self.df_patient_info["IsocenterOnArms"].to_numpy()
+            bool_arms = iso_on_arms.astype(bool)
 
-    if single_fig:
-        single_figure_plot(
-            patient_idx,
-            path,
-            processing_raw,
-            processing_output,
-            pix_spacing,  # pyright: ignore[reportGeneralTypeIssues]
-            slice_thickness,  # pyright: ignore[reportGeneralTypeIssues]
-        )
-    else:
-        separate_plots(
-            patient_idx,
-            path,
-            processing_raw,
-            processing_output,
-            pix_spacing,  # pyright: ignore[reportGeneralTypeIssues]
-            slice_thickness,  # pyright: ignore[reportGeneralTypeIssues]
-            mse=mse,
+        elif MODEL == "body":
+            iso_on_arms = self.df_patient_info["IsocenterOnArms"].to_numpy()
+            bool_arms = ~iso_on_arms.astype(bool)
+
+        pix_spacing_col_idx = self.df_patient_info.columns.get_loc(key="PixelSpacing")
+        slice_tickness_col_idx = self.df_patient_info.columns.get_loc(
+            key="SliceThickness"
         )
 
+    def build_output(
+        self, y_hat: torch.Tensor, patient_idx: int, aspect_ratio: float
+    ) -> torch.Tensor:
+        output = np.zeros(shape=(84))
+        if y_hat.shape[0] == 39:
+            # Isocenter indexes
+            index_X = [0, 3, 6, 9, 12, 15, 18, 21, 24, 27]
+            index_Y = [1, 4, 7, 10, 13, 16, 19, 22, 25, 28]
+            output[index_X] = self.find_x_coord(
+                self.ptvs[patient_idx]
+            )  # x coord repeated 8 times + 2 times for iso thorax
+            output[
+                index_Y
+            ] = 100  # y coord repeated 8 times + 2 times for iso thorax, setted to 0
+            output[30] = y_hat[0].item()  # x coord right arm
+            output[
+                [31, 34]
+            ] = 100  # y coord for arms repeated twice, also constrained to 0
+            output[33] = y_hat[1].item()  # x coord left arm
 
-def x_fields_iso_out_of_backbone(aspect_ratio, processing_output, x_right, x_left):
-    if processing_output.isocenters_pix[0][2, 2] < x_left:
-        processing_output.jaws_X_pix[0][2, 1] = (
-            x_right - processing_output.isocenters_pix[0][2, 2] - 1
-        ) * aspect_ratio
-        processing_output.jaws_X_pix[0][5, 0] = (
-            x_left - processing_output.isocenters_pix[0][4, 2] + 1
-        ) * aspect_ratio
+            for z in range(6):  # z coords
+                output[z * 3 * 2 + 2] = y_hat[z + 2].item()
+                output[z * 3 * 2 + 5] = y_hat[z + 2].item()
 
+            # Begin jaw_X
+            for i in range(11):
+                output[36 + i] = y_hat[
+                    8 + i
+                ].item()  # retrieve apertures of first 11 fields
 
-def single_figure_plot(
-    patient_idx: int,
-    path: str,
-    processing_raw: Processing,
-    processing_output: Processing,
-    pix_spacing: float,
-    slice_thickness: float,
-) -> None:
-    """
-    Plot the predicted and true isocenters, jaws, and mask of a single patient, overlaying the predicted
-    isocenters and jaws on the true data.
+            for i in range(3):
+                output[48 + i] = y_hat[
+                    19 + i
+                ].item()  # add in groups of three avoiding repetitions
+                output[52 + i] = y_hat[22 + i].item()
+                output[56 + i] = y_hat[25 + i].item()
 
-    Args:
-    - patient_idx (int): Index of the patient to plot.
-    - path (str): Path where to save the plot.
-    - processing (Processing object): Processing object containing the true mask, isocenters, jaws, and
-    collimator angles.
-    - test (Processing object): Processing object containing the predicted isocenters, jaws, and collimator
-    angles.
-    - pix_spacing (float): Pixel spacing of the CT images.
-    - slice_thickness (float): Slice thickness of the CT images.
+            # Symmetric apertures
+            output[47] = -output[44]
+            output[51] = -output[48]
+            output[55] = -output[52]
 
-    Returns:
-    - None: The function saves the plot to disk, then closes it.
-    """
-    aspect_ratio = slice_thickness / pix_spacing
+            output[59] = y_hat[28].item()
 
-    plt.imshow(processing_raw.masks[patient_idx], cmap="gray", aspect=1 / aspect_ratio)
-    plt.contourf(processing_raw.masks[patient_idx], alpha=0.25)
+            # Begin jaw_Y
+            for i in range(4):
+                if i < 2:
+                    # Same apertures opposite signs
+                    output[60 + 2 * i] = y_hat[i + 29].item()
+                    output[61 + 2 * i] = -y_hat[i + 29].item()
 
-    plt.scatter(
-        processing_output.isocenters_pix[0, :, 2],
-        processing_output.isocenters_pix[0, :, 0],
-        color="red",
-        s=7,
-    )
-    plot_fields(
-        plt.gca(),
-        processing_output.isocenters_pix[0],
-        processing_output.jaws_X_pix[0],
-        processing_output.jaws_Y_pix[0],
-        processing_output.coll_angles,
-        slice_thickness,
-        pix_spacing,
-    )
+                    # 4 fields with equal (and opposite) apertures
+                    output[64 + 2 * i] = y_hat[31].item()
+                    output[65 + 2 * i] = -y_hat[31].item()
+                    output[68 + 2 * i] = y_hat[32].item()  # index 35 == thorax iso
+                    output[69 + 2 * i] = -y_hat[32].item()
 
-    # Plot ground thruth
-    plt.scatter(
-        processing_raw.isocenters_pix[patient_idx, :, 2],
-        processing_raw.isocenters_pix[patient_idx, :, 0],
-        color="blue",
-        s=7,
-    )
-    plot_fields(
-        plt.gca(),
-        processing_raw.isocenters_pix[patient_idx],
-        processing_raw.jaws_X_pix[patient_idx],
-        processing_raw.jaws_Y_pix[patient_idx],
-        coll_angles[patient_idx],
-        slice_thickness,
-        pix_spacing,
-        "b",
-    )
+                    # 2 fields with equal (and opposite) apertures
+                    output[72 + 2 * i] = y_hat[31].item()
+                    output[73 + 2 * i] = -y_hat[31].item()
 
-    red_patch = mpatches.Patch(color="red", label="Pred")
-    blue_patch = mpatches.Patch(color="blue", label="Real")
-    plt.legend(handles=[red_patch, blue_patch], loc=0, frameon=True)
+                    # Arms apertures with opposite sign
+                    output[80 + 2 * i] = y_hat[37 + i].item()
+                    output[81 + 2 * i] = -y_hat[37 + i].item()
 
-    eval_img_path = os.path.join(path, "eval_img")
-    if not os.path.exists(eval_img_path):
-        os.makedirs(eval_img_path)
+                output[76 + i] = y_hat[33 + i].item()  # apertures for the head
+        if y_hat.shape[0] == 32:
+            # Isocenter indexes
+            index_X = [0, 3, 6, 9, 12, 15, 18, 21, 24, 27]
+            index_Y = [1, 4, 7, 10, 13, 16, 19, 22, 25, 28]
+            output[index_X] = self.find_x_coord(
+                self.ptvs[patient_idx]
+            )  # x coord repeated 8 times + 2 times for iso thorax
+            output[
+                index_Y
+            ] = 100  # y coord repeated 8 times + 2 times for iso thorax, setted to 100
+            output[30] = y_hat[0].item()  # x coord right arm
+            output[
+                [31, 34]
+            ] = 100  # y coord for arms repeated twice, also constrained to 100
+            output[33] = y_hat[1].item()  # x coord left arm
 
-    plt.savefig(os.path.join(eval_img_path, f"output_train_{patient_idx}"), dpi=2000)
-    plt.close()
+            for z in range(2):  # first two z coords
+                output[z * 3 * 2 + 2] = y_hat[z + 2].item()
+                output[z * 3 * 2 + 5] = y_hat[z + 2].item()
+            output[20] = 0  # we skip the third ISO
+            output[23] = 0  # we skip the third ISO
+            for z in range(3):  # last three z coords we skip the third ISO
+                output[(z + 3) * 3 * 2 + 2] = y_hat[z + 4].item()
+                output[(z + 3) * 3 * 2 + 5] = y_hat[z + 4].item()
 
+            # Begin jaw_X
+            # 4 Legs + 3 Pelvi
+            for i in range(5):
+                output[36 + i] = y_hat[
+                    7 + i
+                ].item()  # retrieve apertures of first 11 fields
+            output[42] = y_hat[12].item()
+            output[43] = y_hat[13].item()
+            # 3 for third iso = null + one symmetric (thus 0 )
+            for i in range(3):
+                output[44 + i] = 0
+            # 3 for chest iso = null + one symmetric (again 0 so)
+            output[48] = y_hat[14].item()
+            output[50] = y_hat[15].item()  # add in groups of three avoiding repetitions
 
-def separate_plots(
-    patient_idx: int,
-    path: str,
-    processing_raw: Processing,
-    processing_output: Processing,
-    pix_spacing: float,
-    slice_thickness: float,
-    mse: torch.Tensor = torch.tensor(0),
-) -> None:
-    """
-    Plot the predicted and true isocenters, jaws, and mask of a single patient, in two different files png,
-    one for the real and another for the predicted one.
+            for i in range(3):
+                # Head
+                output[52 + i] = y_hat[16 + i].item()
+                # Arms
+                output[56 + i] = y_hat[19 + i].item()
 
-    Args:
-    - patient_idx (int): Index of the patient to plot.
-    - path (str): Path where to save the plot.
-    - processing (Processing object): Processing object containing the true mask, isocenters, jaws, and
-    collimator angles.
-    - test (Processing object): Processing object containing the predicted isocenters, jaws, and collimator
-    angles.
-    - pix_spacing (float): Pixel spacing of the CT images.
-    - slice_thickness (float): Slice thickness of the CT images.
-    - mse (torch.Tensor): MSE loss added in the figure title.
+            # Symmetric apertures
+            output[47] = -output[44]
+            output[51] = -output[48]
+            output[55] = -output[52]
 
-    Returns:
-    - None: The function saves the plot to disk, then closes it.
-    """
-    aspect_ratio = slice_thickness / pix_spacing
+            output[59] = y_hat[22].item()
+            # Overlap fields
+            norm = aspect_ratio * self.ptvs[patient_idx].shape[1] / 512
+            output[41] = (y_hat[3].item() - y_hat[4].item() + 0.01) * norm + output[
+                50
+            ]  # abdom
+            output[49] = (y_hat[4].item() - y_hat[5].item() + 0.03) * norm + output[
+                54
+            ]  # chest
 
-    # Plot predictions
-    plt.imshow(processing_raw.masks[patient_idx], cmap="gray", aspect=1 / aspect_ratio)
-    # plt.contourf(processing_raw.masks[patient_idx], alpha=0.25)
-    plt.scatter(
-        processing_output.isocenters_pix[0, :, 2],
-        processing_output.isocenters_pix[0, :, 0],
-        color="red",
-        s=7,
-    )
-    plot_fields(
-        plt.gca(),
-        processing_output.isocenters_pix[0],
-        processing_output.jaws_X_pix[0],
-        processing_output.jaws_Y_pix[0],
-        processing_output.coll_angles,
-        slice_thickness,
-        pix_spacing,
-        single_fig=True,
-    )
-    plt.title(f"MSE loss: {mse}")
-    predict_img_path = os.path.join(path, "predict_img")
-    if not os.path.exists(predict_img_path):
-        os.makedirs(predict_img_path)
+            # Begin jaw_Y
+            for i in range(4):
+                if i < 2:
+                    # Same apertures opposite signs #LEGS
+                    output[60 + 2 * i] = y_hat[i + 23].item()
+                    output[61 + 2 * i] = -y_hat[i + 23].item()
 
-    plt.savefig(os.path.join(predict_img_path, f"output_test_{patient_idx}"), dpi=2000)
-    plt.close()
+                    # 4 fields with equal (and opposite) apertures
+                    output[64 + 2 * i] = y_hat[24].item()
+                    output[65 + 2 * i] = -y_hat[24].item()
+                    output[68 + 2 * i] = 0  # index 35 == thorax iso
+                    output[69 + 2 * i] = 0
 
-    # Plot ground thruth
-    plt.imshow(processing_raw.masks[patient_idx], cmap="gray", aspect=1 / aspect_ratio)
-    # plt.contourf(processing_raw.masks[patient_idx], alpha=0.25)
-    plt.scatter(
-        processing_raw.isocenters_pix[patient_idx, :, 2],
-        processing_raw.isocenters_pix[patient_idx, :, 0],
-        color="blue",
-        s=7,
-    )
-    plot_fields(
-        plt.gca(),
-        processing_raw.isocenters_pix[patient_idx],
-        processing_raw.jaws_X_pix[patient_idx],
-        processing_raw.jaws_Y_pix[patient_idx],
-        coll_angles[patient_idx],
-        slice_thickness,
-        pix_spacing,
-        "b",
-        single_fig=True,
-    )
+                    # 2 fields with equal (and opposite) apertures
+                    output[72 + 2 * i] = y_hat[24].item()
+                    output[73 + 2 * i] = -y_hat[24].item()
 
-    real_img_path = os.path.join(path, "real_img")
-    if not os.path.exists(real_img_path):
-        os.makedirs(real_img_path)
+                    # Arms apertures with opposite sign
+                    output[80 + 2 * i] = y_hat[30 + i].item()
+                    output[81 + 2 * i] = -y_hat[30 + i].item()
 
-    plt.savefig(os.path.join(real_img_path, f"output_test_{patient_idx}"), dpi=2000)
-    plt.close()
+                output[76 + i] = y_hat[26 + i].item()  # apertures for the head
+        if y_hat.shape[0] == 25:
+            norm = aspect_ratio * self.ptvs[patient_idx].shape[1] / 512
+            # Isocenter indexes
+            index_X = [
+                0,
+                3,
+                6,
+                9,
+                12,
+                15,
+                18,
+                21,
+                24,
+                27,
+            ]
+            index_Y = [1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34]
+            output[index_X] = self.find_x_coord(
+                self.ptvs[patient_idx]
+            )  # x coord repeated 8 times + 2 times for iso thorax
+            output[
+                index_Y
+            ] = 100  # y coord repeated 8 times + 2 times for iso thorax, setted to 0
+            output[30] = 0  # x coord right arm
+            output[33] = 0  # x coord left arm
 
+            for z in range(2):  # z coords
+                output[z * 3 * 2 + 2] = y_hat[z].item()
+                output[z * 3 * 2 + 5] = y_hat[z].item()
+                output[(z + 3) * 3 * 2 + 2] = y_hat[z + 2].item()
+                output[(z + 3) * 3 * 2 + 5] = y_hat[z + 2].item()
+            output[14] = (output[11] + output[20]) / 2
+            output[17] = (output[11] + output[20]) / 2
+            output[32] = 0  # z coord right arm
+            output[35] = 0  # z coord left arm
 
-def find_x_coord(masks_int: np.ndarray) -> float:
-    """
-        Find the x-coordinate of the center of mass of the given binary masks.
+            # Begin jaw_X
+            for i in range(5):
+                output[36 + i] = y_hat[4 + i].item()  # 4 legs+ down field 4th iso
+            for i in range(3):
+                output[42 + i] = y_hat[9 + i].item()  # 2 4th iso + down field 3rd iso
+                # head fields
+                output[52 + i] = y_hat[15 + i].item()
+                # arms fields
+                output[56 + i] = 0
 
-    Args:
-        masks_int (np.ndarray): A numpy array representing binary masks.
+            # chest
+            output[46] = y_hat[12]  # third iso
+            output[48] = y_hat[13]  # chest iso down field
+            output[50] = y_hat[14]  # chest iso
 
-    Returns:
-        float: The normalized x-coordinate of the center of mass.
+            # Overlap fields
+            output[41] = (output[8] - output[14] + 0.01) * norm + output[46]  # abdom
+            output[45] = (output[14] - output[20] + 0.03) * norm + output[50]  # third
+            output[49] = (output[20] - output[26] + 0.02) * norm + output[54]  # chest
 
-    """
+            # Symmetric apertures
+            # third iso
+            output[47] = -output[44]
+            # chest
+            output[51] = -output[48]
+            # head
+            output[55] = -output[52]
+            # arms
+            output[59] = 0
 
-    x_coord = round(
-        ndimage.center_of_mass(masks_int)[0]  # pyright: ignore[reportGeneralTypeIssues]
-    )
+            # Begin jaw_Y
+            for i in range(4):
+                if i < 2:
+                    # Same apertures opposite signs LEGS
+                    output[60 + 2 * i] = y_hat[i + 18].item()
+                    output[61 + 2 * i] = -y_hat[i + 18].item()
 
-    return x_coord / masks_int.shape[0]  # Normalize the coordinate
+                    # 4 fields with equal (and opposite) apertures
+                    # Pelvi
+                    output[64 + 2 * i] = y_hat[20].item()
+                    output[65 + 2 * i] = -y_hat[20].item()
+                    # Third iso
+                    output[68 + 2 * i] = y_hat[20].item()
+                    output[69 + 2 * i] = -y_hat[20].item()
+                    # Chest
+                    output[72 + 2 * i] = y_hat[20].item()
+                    output[73 + 2 * i] = -y_hat[20].item()
 
+                    # Arms apertures with opposite sign
+                    output[80 + 2 * i] = 0
+                    output[81 + 2 * i] = 0
 
-def find_fields_coor(
-    pat_index: int, masks_int: np.ndarray, iso: np.ndarray
-) -> tuple[int, int, int, int, int]:
-    df_patient_info = pd.read_csv(r"D:\tmi-isocenter-1\data\patient_info.csv")
-    iso_on_arms = df_patient_info["IsocenterOnArms"].to_numpy()
-    bool_arms = iso_on_arms.astype(bool)
+                output[76 + i] = y_hat[21 + i].item()  # apertures for the head
+            # output[68]=-0.5/aspect_ratio #TO DELETE
 
-    def loss_fun(pos_new):
-        x = pos_new["x1"]
-        a1 = np.sum(masks_int[:, x])
-        score = a1
-        return -score
+        return torch.Tensor(output)
 
-    search_space = {
-        "x1": np.arange(0, masks_int.shape[1], 1),
-    }
+    def extract_original_data(
+        self,
+        output: torch.Tensor,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """
+        Reorganize the data from a given output torch.Tensor, returns them in three separate 2D arrays.
 
-    def constraint_1(para):
-        a = (iso[0, 2] + iso[2, 2]) / 2 + 10
-        if bool_arms[pat_index] == True:
-            a = (iso[0, 2] + iso[2, 2]) / 2
-        b = (iso[2, 2] + iso[6, 2]) / 2
-        return para["x1"] > a and para["x1"] < b
-        # put one or more constraints inside a list
+        Parameters:
+            output : torch.Tensor
+                A 1D NumPy array containing the data to be extracted. The expected length of this array is 84.
 
-    constraints_list = [constraint_1]
-    # pass list of constraints to the optimizer
-    opt = RandomSearchOptimizer(search_space, constraints=constraints_list)
-    opt.search(loss_fun, n_iter=100)
+        Returns:
+            tuple of 3 numpy.ndarray
+                A tuple containing the following 2D NumPy arrays:
+                - isocenters_hat: a 12x3 array containing the extracted isocenter positions in x, y, and z dimensions.
+                - jaws_X_pix_hat: a 12x2 array containing the extracted X-jaw positions in left and right directions.
+                - jaws_Y_pix_hat: a 12x2 array containing the extracted Y-jaw positions in inferior and superior directions.
 
-    start_value = opt.best_value[0]
-    min = 512
-    backbone = int(find_x_coord(ptvs[pat_index]) * masks_int.shape[0])
-    y_pixels = np.concatenate(
-        (
-            np.arange(backbone - 115, backbone - 50),
-            np.arange(backbone + 50, backbone + 115),
+        Notes:
+        ------
+        - The function assumes that the `output` array is of length 84, which is the expected size of the relevant data.
+        """
+        isocenters_hat = np.zeros((12, 3))
+        jaws_X_pix_hat = np.zeros((12, 2))
+        jaws_Y_pix_hat = np.zeros((12, 2))
+        for i in range(12):
+            for j in range(3):
+                isocenters_hat[i, j] = output[3 * i + j]
+                if j < 2:
+                    jaws_X_pix_hat[i, j] = output[36 + 2 * i + j]
+                    jaws_Y_pix_hat[i, j] = output[60 + 2 * i + j]
+
+        return (isocenters_hat, jaws_X_pix_hat, jaws_Y_pix_hat)
+
+    def add_rectangle_patch(
+        self,
+        ax: plt.Axes,
+        anchor: tuple[float, float],
+        width: float,
+        height: float,
+        rotation_point: tuple[float, float],
+        angle: float,
+        color: str = "r",
+    ) -> None:
+        """
+        Adds a rectangle patch to the given Matplotlib Axes object.
+
+        Parameters:
+            ax (plt.Axes): The Matplotlib Axes object to add the rectangle patch to.
+            anchor (tuple[float, float]): The (x, y) coordinates of the bottom-left corner of the rectangle.
+            width (float): The width of the rectangle.
+            height (float): The height of the rectangle.
+            rotation_point (tuple[float, float]): The (x, y) coordinates of the point around which to rotate the rectangle.
+            angle (float): The angle (in degrees) by which to rotate the rectangle around the rotation point.
+            color (str, optional): The color of the rectangle's edge. Defaults to "r" (red).
+
+        Returns:
+            None
+        """
+        if color == "r":
+            linestyle = "-"
+        else:
+            linestyle = "--"
+        ax.add_patch(
+            mpatches.Rectangle(
+                anchor,
+                width,
+                height,
+                angle=angle,
+                rotation_point=rotation_point,
+                linestyle=linestyle,
+                linewidth=0.7,
+                edgecolor=color,
+                facecolor="none",
+            )
         )
-    )
-    for j in y_pixels:
-        count = 0
-        for i in range(40):
-            if masks_int[j, opt.best_value[0] + i] == False:
-                count += 1
+
+    def plot_fields(
+        self,
+        ax: plt.Axes,
+        iso_pixel: np.ndarray,
+        jaw_X: np.ndarray,
+        jaw_Y: np.ndarray,
+        coll_angles: np.ndarray,
+        slice_thickness: float,
+        pix_spacing: float,
+        color: str = "r",
+        unit_measure: Literal["pix", "mm"] = "pix",
+        single_fig: bool = False,
+    ) -> None:
+        """
+        Plots rectangular fields on a given Matplotlib Axes object, based on information about each field's isocenter,
+        jaw position, and collimator angle.
+
+        Parameters:
+            ax (plt.Axes): The Matplotlib Axes object to plot the fields on.
+            iso_pixel (np.ndarray): A 2D NumPy array containing the (row, col, depth) coordinates of each field's isocenter.
+            jaw_X (np.ndarray): A 2D NumPy array containing the X positions of each field's jaw edges.
+            jaw_Y (np.ndarray): A 2D NumPy array containing the Y positions of each field's jaw edges.
+            coll_angles (np.ndarray): A 1D NumPy array containing the collimator angles of each field.
+            slice_thickness (float): The thickness of the slice being plotted (in units of the `unit_measure` parameter).
+            pix_spacing (float): The pixel spacing of the slice being plotted (in units of the `unit_measure` parameter).
+            color (str, optional): The color of the rectangle's edge. Defaults to "r" (red).
+            unit_measure (str, optional): The units of the `slice_thickness` and `pix_spacing` parameters.
+                Must be "pix" or "mm". Defaults to "pix".
+
+        Returns:
+            None
+
+        Raises:
+            ValueError: If `unit_measure` is not "pix" or "mm".
+        """
+        aspect_ratio = slice_thickness / pix_spacing
+        color_flag = True
+        for i, (iso, X, Y, angle) in enumerate(
+            zip(
+                iso_pixel,
+                jaw_X,
+                jaw_Y,
+                coll_angles,
+            )
+        ):
+            if all(iso == 0):
+                continue  # isocenter not present, skip field
+            iso_pixel_col, iso_pixel_row = iso[2], iso[0]
+            if unit_measure == "pix":
+                offset_col = Y[0]
+                offset_row = X[1]
+                width = Y[1] - Y[0]
+                height = X[1] - X[0]
+            elif unit_measure == "mm":
+                offset_col = Y[0] / slice_thickness
+                offset_row = X[1] / pix_spacing
+                width = (Y[1] - Y[0]) / slice_thickness
+                height = (X[1] - X[0]) / pix_spacing
             else:
-                if (
-                    masks_int[j, opt.best_value[0] + i]
-                    != masks_int[j, opt.best_value[0] + i + 1]
-                ):
-                    count = 1000
-                if count == 0:
-                    count = 1000
-        if min > count:
-            min = count
-            min_pos_x_RU = opt.best_value[0] + count
-            min_pos_y_RU = j
-    R_pos_x = min_pos_x_RU  # pyright: ignore[reportUnboundVariable]
-    R_pos_y = min_pos_y_RU  # pyright: ignore[reportUnboundVariable]
-    min = 512
-    for j in y_pixels:
-        count = 0
-        for i in range(40):
-            if masks_int[j, opt.best_value[0] - i] == False:
-                count += 1
-            else:
-                if (
-                    masks_int[j, opt.best_value[0] - i]
-                    != masks_int[j, opt.best_value[0] - i - 1]
-                ):
-                    count = 1000
-                    break
-                if count == 0:
-                    count = 1000
-        if min > count:
-            min = count
-            min_pos_x_LU = opt.best_value[0] - count
-            min_pos_y_LU = j
-    L_pos_x = min_pos_x_LU  # pyright: ignore[reportUnboundVariable]
-    L_pos_y = min_pos_y_LU  # pyright: ignore[reportUnboundVariable]
+                raise ValueError(
+                    f'unit_measure must be "pix" or "mm" but was {unit_measure}'
+                )
 
-    return start_value, R_pos_x, R_pos_y, L_pos_x, L_pos_y  # Normalize the coordinate
+            if angle != 90:
+                print(
+                    f"Collimator angle for field {i + 1} was {angle}°. Plotting with angle=0° for visualization"
+                )
+                angle = 0
+            elif angle == 90:
+                offset_col *= aspect_ratio
+                offset_row /= aspect_ratio
+                width *= aspect_ratio
+                height /= aspect_ratio
+            if single_fig:
+                if color_flag:
+                    color = "r"
+                else:
+                    color = "b"
+            self.add_rectangle_patch(
+                ax,
+                (iso_pixel_col + offset_col, iso_pixel_row - offset_row),
+                width,
+                height,
+                (iso_pixel_col, iso_pixel_row),
+                angle,
+                color,
+            )
+            if single_fig:
+                color_flag = not color_flag
+
+    def plot_img(
+        self,
+        patient_idx: int,
+        output: torch.Tensor,
+        path: str,
+        coll_angle_hat: torch.Tensor = torch.ones(
+            1
+        ),  # Default 90, if isn't important visualize the angle.
+        mse: torch.Tensor = torch.tensor(0),
+        single_fig: bool = False,
+    ) -> None:
+        """
+        Generates and saves a plot of two images for a given patient: the original image and a transformed image.
+
+        Parameters:
+            patient_idx : int
+                The index of the patient to plot.
+            output : torch.Tensor
+                A 1D NumPy array containing the output of a model for the specified patient.
+            path : str
+                The path where the plot image will be saved.
+            mse: torch.Tensor
+                MSE loss added in the figure title of separate plots.
+            single_fig : bool
+                Whether to plot ground thruth and predictions in the same image
+
+        Returns:
+            None
+
+        Notes:
+        ------
+        - The function calls the `extract_data` function to reorganize the CNN output.
+        """
+        pix_spacing_col_idx = self.df_patient_info.columns.get_loc(key="PixelSpacing")
+        slice_tickness_col_idx = self.df_patient_info.columns.get_loc(
+            key="SliceThickness"
+        )
+        pix_spacing = self.df_patient_info.iloc[patient_idx, pix_spacing_col_idx]
+        slice_thickness = self.df_patient_info.iloc[patient_idx, slice_tickness_col_idx]
+        aspect_ratio = (
+            slice_thickness / pix_spacing
+        )  # pyright: ignore[reportGeneralTypeIssues]
+        if output.shape[0] < 84:
+            output = self.build_output(output, patient_idx, aspect_ratio)
+
+        isocenters_hat, jaws_X_pix_hat, jaws_Y_pix_hat = self.extract_original_data(
+            output
+        )
+
+        processing_raw = Processing(
+            self.ptvs,
+            self.isocenters_pix,
+            self.jaws_X_pix,
+            self.jaws_Y_pix,
+            self.coll_angles,
+        )
+        processing_raw.resize()
+        processing_raw.rotate_90()
+        isocenters_hat = isocenters_hat[np.newaxis]
+        jaws_X_pix_hat = jaws_X_pix_hat[np.newaxis]
+        jaws_Y_pix_hat = jaws_Y_pix_hat[np.newaxis]
+        angles = 90 * np.ones(12)
+        if round(torch.sigmoid(coll_angle_hat).item()) == 1:
+            angles[0] = 355
+            angles[1] = 5
+
+        if MODEL != "body":
+            angles[10] = 355
+            angles[11] = 5
+        processing_output = Processing(
+            [processing_raw.masks[patient_idx]],  # resized mask
+            isocenters_hat,
+            jaws_X_pix_hat,
+            jaws_Y_pix_hat,
+            angles,
+        )
+
+        # Retrieve information of the original shape
+        processing_output.original_sizes = [processing_raw.original_sizes[patient_idx]]
+        processing_output.inverse_trasform()
+
+        start_value, x_right, y_right, x_left, y_left = self.find_fields_coor(
+            patient_idx,
+            self.ptv_masks[patient_idx],
+            processing_output.isocenters_pix[0],
+        )
+        if (
+            (x_right)  # -(x_right - x_left) / 4
+            < (processing_output.isocenters_pix[0][2, 2])
+            < (x_right + (x_right - x_left) / 2)
+        ) and MODEL == "arms":
+            # Shifting the isocenter when it is in the region defined above
+
+            processing_output.isocenters_pix[0][2, 2] = (
+                x_left + (x_right - x_left) * 3 / 4
+            )
+            processing_output.isocenters_pix[0][3, 2] = (
+                x_left + (x_right - x_left) * 3 / 4
+            )
+        if (
+            (x_left - (x_right - x_left) / 2)
+            < (processing_output.isocenters_pix[0][2, 2])
+            < (x_left + (x_right - x_left) / 2)
+        ) and MODEL == "body":
+            # Shifting the isocenter when it is in the region defined above
+            processing_output.isocenters_pix[0][2, 2] = x_left - 10
+            processing_output.isocenters_pix[0][3, 2] = x_left - 10
+        if x_left < processing_output.isocenters_pix[0][2, 2] < x_right:
+            # Setting isocenter's fields over the backbone
+            processing_output.jaws_X_pix[0][2, 0] = (
+                (x_left - processing_output.isocenters_pix[0][2, 2] + 1)
+                * aspect_ratio
+                / 2
+            )
+            processing_output.jaws_X_pix[0][3, 1] = (
+                (x_right - processing_output.isocenters_pix[0][2, 2] - 1)
+                * aspect_ratio
+                / 2
+            )
+        self.fields_on_backbone(aspect_ratio, processing_output, x_right, x_left)
+        # splitting the distance between the two last iso.
+        if MODEL == "body" and processing_output.isocenters_pix[0][2, 2] < x_left:
+            translation = (
+                1
+                / 2
+                * (
+                    (
+                        processing_output.isocenters_pix[0][2, 2]
+                        + processing_output.jaws_X_pix[0][3, 0] / aspect_ratio
+                    )
+                    - (
+                        processing_output.isocenters_pix[0][0, 2]
+                        + processing_output.jaws_X_pix[0][1, 1] / aspect_ratio
+                    )
+                    + (
+                        processing_output.isocenters_pix[0][4, 2]
+                        + processing_output.jaws_X_pix[0][5, 0] / aspect_ratio
+                    )
+                    - (
+                        processing_output.isocenters_pix[0][2, 2]
+                        + processing_output.jaws_X_pix[0][3, 1] / aspect_ratio
+                    )
+                )
+            )
+
+            processing_output.isocenters_pix[0][2, 2] = (
+                processing_output.isocenters_pix[0][0, 2]
+                + processing_output.jaws_X_pix[0][1, 1] / aspect_ratio
+                + translation
+                - processing_output.jaws_X_pix[0][3, 0] / aspect_ratio
+            )
+            processing_output.isocenters_pix[0][3, 2] = (
+                processing_output.isocenters_pix[0][0, 2]
+                + processing_output.jaws_X_pix[0][1, 1] / aspect_ratio
+                + translation
+                - processing_output.jaws_X_pix[0][3, 0] / aspect_ratio
+            )
+            processing_output.isocenters_pix[0][4, 2] = (
+                processing_output.isocenters_pix[0][3, 2]
+                + processing_output.isocenters_pix[0][6, 2]
+            ) / 2
+            processing_output.isocenters_pix[0][5, 2] = (
+                processing_output.isocenters_pix[0][3, 2]
+                + processing_output.isocenters_pix[0][6, 2]
+            ) / 2
+            self.fields_on_backbone(aspect_ratio, processing_output, x_right, x_left)
+        if processing_output.isocenters_pix[0][2, 2] > x_right:
+            if MODEL == "arms":
+                processing_output.jaws_X_pix[0][0, 1] = (
+                    x_right - processing_output.isocenters_pix[0][0, 2] - 1
+                ) * aspect_ratio
+                processing_output.jaws_X_pix[0][3, 0] = (
+                    (x_left - processing_output.isocenters_pix[0][2, 2]) + 1
+                ) * aspect_ratio
+        processing_raw.inverse_rotate_90()
+        processing_raw.inverse_resize()
+
+        if single_fig:
+            self.single_figure_plot(
+                patient_idx,
+                path,
+                processing_raw,
+                processing_output,
+                pix_spacing,  # pyright: ignore[reportGeneralTypeIssues]
+                slice_thickness,  # pyright: ignore[reportGeneralTypeIssues]
+            )
+        else:
+            self.separate_plots(
+                patient_idx,
+                path,
+                processing_raw,
+                processing_output,
+                pix_spacing,  # pyright: ignore[reportGeneralTypeIssues]
+                slice_thickness,  # pyright: ignore[reportGeneralTypeIssues]
+                mse=mse,
+            )
+
+    def fields_on_backbone(self, aspect_ratio, processing_output, x_right, x_left):
+        if processing_output.isocenters_pix[0][2, 2] < x_left:
+            processing_output.jaws_X_pix[0][2, 1] = (
+                x_right - processing_output.isocenters_pix[0][2, 2] - 1
+            ) * aspect_ratio
+            processing_output.jaws_X_pix[0][5, 0] = (
+                x_left - processing_output.isocenters_pix[0][4, 2] + 1
+            ) * aspect_ratio
+
+    def single_figure_plot(
+        self,
+        patient_idx: int,
+        path: str,
+        processing_raw: Processing,
+        processing_output: Processing,
+        pix_spacing: float,
+        slice_thickness: float,
+    ) -> None:
+        """
+        Plot the predicted and true isocenters, jaws, and mask of a single patient, overlaying the predicted
+        isocenters and jaws on the true data.
+
+        Args:
+        - patient_idx (int): Index of the patient to plot.
+        - path (str): Path where to save the plot.
+        - processing (Processing object): Processing object containing the true mask, isocenters, jaws, and
+        collimator angles.
+        - test (Processing object): Processing object containing the predicted isocenters, jaws, and collimator
+        angles.
+        - pix_spacing (float): Pixel spacing of the CT images.
+        - slice_thickness (float): Slice thickness of the CT images.
+
+        Returns:
+        - None: The function saves the plot to disk, then closes it.
+        """
+        aspect_ratio = slice_thickness / pix_spacing
+
+        plt.imshow(
+            processing_raw.masks[patient_idx], cmap="gray", aspect=1 / aspect_ratio
+        )
+        plt.contourf(processing_raw.masks[patient_idx], alpha=0.25)
+
+        plt.scatter(
+            processing_output.isocenters_pix[0, :, 2],
+            processing_output.isocenters_pix[0, :, 0],
+            color="red",
+            s=7,
+        )
+        self.plot_fields(
+            plt.gca(),
+            processing_output.isocenters_pix[0],
+            processing_output.jaws_X_pix[0],
+            processing_output.jaws_Y_pix[0],
+            processing_output.coll_angles,
+            slice_thickness,
+            pix_spacing,
+        )
+
+        # Plot ground thruth
+        plt.scatter(
+            processing_raw.isocenters_pix[patient_idx, :, 2],
+            processing_raw.isocenters_pix[patient_idx, :, 0],
+            color="blue",
+            s=7,
+        )
+        self.plot_fields(
+            plt.gca(),
+            processing_raw.isocenters_pix[patient_idx],
+            processing_raw.jaws_X_pix[patient_idx],
+            processing_raw.jaws_Y_pix[patient_idx],
+            self.coll_angles[patient_idx],
+            slice_thickness,
+            pix_spacing,
+            "b",
+        )
+
+        red_patch = mpatches.Patch(color="red", label="Pred")
+        blue_patch = mpatches.Patch(color="blue", label="Real")
+        plt.legend(handles=[red_patch, blue_patch], loc=0, frameon=True)
+
+        eval_img_path = os.path.join(path, "eval_img")
+        if not os.path.exists(eval_img_path):
+            os.makedirs(eval_img_path)
+
+        plt.savefig(
+            os.path.join(eval_img_path, f"output_train_{patient_idx}"), dpi=2000
+        )
+        plt.close()
+
+    def separate_plots(
+        self,
+        patient_idx: int,
+        path: str,
+        processing_raw: Processing,
+        processing_output: Processing,
+        pix_spacing: float,
+        slice_thickness: float,
+        mse: torch.Tensor = torch.tensor(0),
+    ) -> None:
+        """
+        Plot the predicted and true isocenters, jaws, and mask of a single patient, in two different files png,
+        one for the real and another for the predicted one.
+
+        Args:
+        - patient_idx (int): Index of the patient to plot.
+        - path (str): Path where to save the plot.
+        - processing (Processing object): Processing object containing the true mask, isocenters, jaws, and
+        collimator angles.
+        - test (Processing object): Processing object containing the predicted isocenters, jaws, and collimator
+        angles.
+        - pix_spacing (float): Pixel spacing of the CT images.
+        - slice_thickness (float): Slice thickness of the CT images.
+        - mse (torch.Tensor): MSE loss added in the figure title.
+
+        Returns:
+        - None: The function saves the plot to disk, then closes it.
+        """
+        aspect_ratio = slice_thickness / pix_spacing
+
+        # Plot predictions
+        plt.imshow(
+            processing_raw.masks[patient_idx], cmap="gray", aspect=1 / aspect_ratio
+        )
+        # plt.contourf(processing_raw.masks[patient_idx], alpha=0.25)
+        plt.scatter(
+            processing_output.isocenters_pix[0, :, 2],
+            processing_output.isocenters_pix[0, :, 0],
+            color="red",
+            s=7,
+        )
+        self.plot_fields(
+            plt.gca(),
+            processing_output.isocenters_pix[0],
+            processing_output.jaws_X_pix[0],
+            processing_output.jaws_Y_pix[0],
+            processing_output.coll_angles,
+            slice_thickness,
+            pix_spacing,
+            single_fig=True,
+        )
+        plt.title(f"MSE loss: {mse}")
+        predict_img_path = os.path.join(path, "predict_img")
+        if not os.path.exists(predict_img_path):
+            os.makedirs(predict_img_path)
+
+        plt.savefig(
+            os.path.join(predict_img_path, f"output_test_{patient_idx}"), dpi=2000
+        )
+        plt.close()
+
+        # Plot ground thruth
+        plt.imshow(
+            processing_raw.masks[patient_idx], cmap="gray", aspect=1 / aspect_ratio
+        )
+        # plt.contourf(processing_raw.masks[patient_idx], alpha=0.25)
+        plt.scatter(
+            processing_raw.isocenters_pix[patient_idx, :, 2],
+            processing_raw.isocenters_pix[patient_idx, :, 0],
+            color="blue",
+            s=7,
+        )
+        self.plot_fields(
+            plt.gca(),
+            processing_raw.isocenters_pix[patient_idx],
+            processing_raw.jaws_X_pix[patient_idx],
+            processing_raw.jaws_Y_pix[patient_idx],
+            self.coll_angles[patient_idx],
+            slice_thickness,
+            pix_spacing,
+            "b",
+            single_fig=True,
+        )
+
+        real_img_path = os.path.join(path, "real_img")
+        if not os.path.exists(real_img_path):
+            os.makedirs(real_img_path)
+
+        plt.savefig(os.path.join(real_img_path, f"output_test_{patient_idx}"), dpi=2000)
+        plt.close()
+
+    def find_x_coord(self, masks_int: np.ndarray) -> float:
+        """
+            Find the x-coordinate of the center of mass of the given binary masks.
+
+        Args:
+            masks_int (np.ndarray): A numpy array representing binary masks.
+
+        Returns:
+            float: The normalized x-coordinate of the center of mass.
+
+        """
+
+        x_coord = round(
+            ndimage.center_of_mass(masks_int)[
+                0
+            ]  # pyright: ignore[reportGeneralTypeIssues]
+        )
+
+        return x_coord / masks_int.shape[0]  # Normalize the coordinate
+
+    def find_fields_coor(
+        self, pat_index: int, masks_int: np.ndarray, iso: np.ndarray
+    ) -> tuple[int, int, int, int, int]:
+        df_patient_info = pd.read_csv(r"D:\tmi-isocenter-1\data\patient_info.csv")
+        iso_on_arms = df_patient_info["IsocenterOnArms"].to_numpy()
+        bool_arms = iso_on_arms.astype(bool)
+
+        def loss_fun(pos_new):
+            x = pos_new["x1"]
+            a1 = np.sum(masks_int[:, x])
+            score = a1
+            return -score
+
+        search_space = {
+            "x1": np.arange(0, masks_int.shape[1], 1),
+        }
+
+        def constraint_1(para):
+            a = (iso[0, 2] + iso[2, 2]) / 2 + 10
+            if bool_arms[pat_index] == True:
+                a = (iso[0, 2] + iso[2, 2]) / 2
+            b = (iso[2, 2] + iso[6, 2]) / 2
+            return para["x1"] > a and para["x1"] < b
+            # put one or more constraints inside a list
+
+        constraints_list = [constraint_1]
+        # pass list of constraints to the optimizer
+        opt = RandomSearchOptimizer(search_space, constraints=constraints_list)
+        opt.search(loss_fun, n_iter=100)
+
+        start_value = opt.best_value[0]
+        min = 512
+        backbone = int(self.find_x_coord(self.ptvs[pat_index]) * masks_int.shape[0])
+        y_pixels = np.concatenate(
+            (
+                np.arange(backbone - 115, backbone - 50),
+                np.arange(backbone + 50, backbone + 115),
+            )
+        )
+        for j in y_pixels:
+            count = 0
+            flag = True
+            for i in range(40):
+                if masks_int[j, opt.best_value[0] + i] == False and flag:
+                    if (
+                        masks_int[j, opt.best_value[0] + i]
+                        == masks_int[j, opt.best_value[0] + i + 1]
+                    ):
+                        count += 1
+                    else:
+                        count += 1
+                        flag = False
+                    if count == 0:
+                        count = min - 1
+            if min > count:
+                min = count
+                min_pos_x_RU = opt.best_value[0] + count
+                min_pos_y_RU = j
+        print(pat_index)
+        R_pos_x = min_pos_x_RU  # pyright: ignore[reportUnboundVariable]
+        R_pos_y = min_pos_y_RU  # pyright: ignore[reportUnboundVariable]
+        min = 512
+        for j in y_pixels:
+            count = 0
+            flag = True
+            for i in range(40):
+                if masks_int[j, opt.best_value[0] - i] == False and flag:
+                    if (
+                        masks_int[j, opt.best_value[0] - i]
+                        == masks_int[j, opt.best_value[0] - i - 1]
+                    ):
+                        count += 1
+                    else:
+                        count += 1
+                        flag = False
+                    if count == 0:
+                        count = min - 1
+                        count = 1000
+            if min > count:
+                min = count
+                min_pos_x_LU = opt.best_value[0] - count
+                min_pos_y_LU = j
+        L_pos_x = min_pos_x_LU  # pyright: ignore[reportUnboundVariable]
+        L_pos_y = min_pos_y_LU  # pyright: ignore[reportUnboundVariable]
+
+        return (
+            start_value,
+            R_pos_x,
+            R_pos_y,
+            L_pos_x,
+            L_pos_y,
+        )  # Normalize the coordinate
 
 
 if __name__ == "__main__":
@@ -977,8 +1029,9 @@ if __name__ == "__main__":
     )
 
     test_build_output = torch.arange(1, 43)  # range [1, 42] step=1, new output shape
-    reconstructed_output = build_output(test_build_output, patient_idx, 4.26)
+    test = Visualize()
+    reconstructed_output = test.build_output(test_build_output, patient_idx, 4.26)
     assert reconstructed_output.shape[0] == 84
 
     path = "test"
-    plot_img(patient_idx, output, path)
+    test.plot_img(patient_idx, output, path)
