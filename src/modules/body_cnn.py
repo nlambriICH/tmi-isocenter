@@ -13,9 +13,9 @@ class BodyCNN(LitCNN):  # pylint: disable=too-many-ancestors
         learning_rate=1e-5,
         mse_loss_weight=5.0,
         bcelogits_loss_weight=0.00000001,
-        weight=2,
+        weight=3,
         activation=nn.ReLU(),
-        focus_on=[1, 2],
+        focus_on=[1],
         filters=4,
         output=25,
     ):

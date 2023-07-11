@@ -6,6 +6,7 @@ import imgaug.augmenters as iaa
 from imgaug.augmentables import Keypoint, KeypointsOnImage
 from src.utils.field_geometry_transf import get_zero_row_idx
 from src.data.processing import Processing
+from src.config.constants import MODEL
 
 
 class Augmentation:
@@ -27,7 +28,10 @@ class Augmentation:
         self.df_patient_info = pd.read_csv(r"data\patient_info.csv")
         self.train_affine = self.train_indexes
         # Define the number of images you want to augment
-        self.num_images_to_augment = 100
+        if MODEL == "body":
+            self.num_images_to_augment = 100
+        else:
+            self.num_images_to_augment = 75
 
     def flip_translate_augmentation(
         self,

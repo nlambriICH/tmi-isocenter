@@ -45,20 +45,7 @@ class DatasetArms(Dataset):
             train_idx,
             train_size=0.9,
         )
-
-        imb_ratio_train = np.sum(self.angle_class[train_idx] == 0) / np.sum(
-            self.angle_class[train_idx] == 1
-        )
-        imb_ratio_val = np.sum(self.angle_class[val_idx] == 0) / np.sum(
-            self.angle_class[val_idx] == 1
-        )
-        imb_ratio_test = np.sum(self.angle_class[test_idx] == 0) / np.sum(
-            self.angle_class[test_idx] == 1
-        )
-        print(f"Imbalance ratio train set: {imb_ratio_train:.1f}")
-        print(f"Imbalance ratio val set: {imb_ratio_val:.1f}")
-        print(f"Imbalance ratio test set: {imb_ratio_test:.1f}")
-
+        self.train_idx = train_idx
         return (train_idx, val_idx, test_idx)
 
     def unique_output(

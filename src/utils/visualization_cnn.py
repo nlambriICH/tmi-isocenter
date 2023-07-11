@@ -32,11 +32,6 @@ class Visualize:
             iso_on_arms = self.df_patient_info["IsocenterOnArms"].to_numpy()
             bool_arms = ~iso_on_arms.astype(bool)
 
-        pix_spacing_col_idx = self.df_patient_info.columns.get_loc(key="PixelSpacing")
-        slice_tickness_col_idx = self.df_patient_info.columns.get_loc(
-            key="SliceThickness"
-        )
-
     def build_output(
         self, y_hat: torch.Tensor, patient_idx: int, aspect_ratio: float
     ) -> torch.Tensor:
@@ -103,7 +98,7 @@ class Visualize:
                     output[81 + 2 * i] = -y_hat[37 + i].item()
 
                 output[76 + i] = y_hat[33 + i].item()  # apertures for the head
-        if y_hat.shape[0] == 32:
+        if y_hat.shape[0] == 32:  # ARMS CASE, can be switched in if MODEL == "arms"
             # Isocenter indexes
             index_X = [0, 3, 6, 9, 12, 15, 18, 21, 24, 27]
             index_Y = [1, 4, 7, 10, 13, 16, 19, 22, 25, 28]
@@ -274,7 +269,6 @@ class Visualize:
                     output[81 + 2 * i] = 0
 
                 output[76 + i] = y_hat[21 + i].item()  # apertures for the head
-            # output[68]=-0.5/aspect_ratio #TO DELETE
 
         return torch.Tensor(output)
 
@@ -532,9 +526,10 @@ class Visualize:
             processing_output.isocenters_pix[0],
         )
         if (
-            (x_right)  # -(x_right - x_left) / 4
+            x_right  # -(x_right - x_left) / 4 To think about it, I prefer don't shift it too many times.
             < (processing_output.isocenters_pix[0][2, 2])
             < (x_right + (x_right - x_left) / 2)
+            or x_left > (processing_output.isocenters_pix[0][2, 2])
         ) and MODEL == "arms":
             # Shifting the isocenter when it is in the region defined above
 
@@ -544,6 +539,13 @@ class Visualize:
             processing_output.isocenters_pix[0][3, 2] = (
                 x_left + (x_right - x_left) * 3 / 4
             )
+            processing_output.jaws_X_pix[0][2, 1] = (
+                processing_output.isocenters_pix[0][4, 2]
+                - processing_output.isocenters_pix[0][2, 2]
+                + 0.01
+            ) * aspect_ratio + processing_output.jaws_X_pix[0][
+                3, 0
+            ]  # abdom
         if (
             (x_left - (x_right - x_left) / 2)
             < (processing_output.isocenters_pix[0][2, 2])
@@ -567,26 +569,22 @@ class Visualize:
         self.fields_on_backbone(aspect_ratio, processing_output, x_right, x_left)
         # splitting the distance between the two last iso.
         if MODEL == "body" and processing_output.isocenters_pix[0][2, 2] < x_left:
-            translation = (
-                1
-                / 2
-                * (
-                    (
-                        processing_output.isocenters_pix[0][2, 2]
-                        + processing_output.jaws_X_pix[0][3, 0] / aspect_ratio
-                    )
-                    - (
-                        processing_output.isocenters_pix[0][0, 2]
-                        + processing_output.jaws_X_pix[0][1, 1] / aspect_ratio
-                    )
-                    + (
-                        processing_output.isocenters_pix[0][4, 2]
-                        + processing_output.jaws_X_pix[0][5, 0] / aspect_ratio
-                    )
-                    - (
-                        processing_output.isocenters_pix[0][2, 2]
-                        + processing_output.jaws_X_pix[0][3, 1] / aspect_ratio
-                    )
+            translation = 0.5 * (
+                (
+                    processing_output.isocenters_pix[0][2, 2]
+                    + processing_output.jaws_X_pix[0][3, 0] / aspect_ratio
+                )
+                - (
+                    processing_output.isocenters_pix[0][0, 2]
+                    + processing_output.jaws_X_pix[0][1, 1] / aspect_ratio
+                )
+                + (
+                    processing_output.isocenters_pix[0][4, 2]
+                    + processing_output.jaws_X_pix[0][5, 0] / aspect_ratio
+                )
+                - (
+                    processing_output.isocenters_pix[0][2, 2]
+                    + processing_output.jaws_X_pix[0][3, 1] / aspect_ratio
                 )
             )
 
@@ -895,12 +893,13 @@ class Visualize:
                         count += 1
                         flag = False
                     if count == 0:
-                        count = min - 1
+                        count = 511
+                if masks_int[j, opt.best_value[0] + i] == True and flag:
+                    count = 511
             if min > count:
                 min = count
                 min_pos_x_RU = opt.best_value[0] + count
                 min_pos_y_RU = j
-        print(pat_index)
         R_pos_x = min_pos_x_RU  # pyright: ignore[reportUnboundVariable]
         R_pos_y = min_pos_y_RU  # pyright: ignore[reportUnboundVariable]
         min = 512

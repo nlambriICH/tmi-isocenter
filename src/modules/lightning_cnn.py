@@ -8,7 +8,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.optim import Adam
 from torchmetrics.classification import BinaryAccuracy
 from src.models.cnn import CNN
-from src.utils.visualization_cnn import plot_img
+from src.utils.visualization_cnn import Visualize
 from src.config.constants import CLASSIFICATION
 
 
@@ -34,7 +34,7 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
         """
         super().__init__()
         self.example_input_array = torch.Tensor(
-            32, 3, 512, 512
+            1, 3, 512, 512
         )  # display the intermediate input and output sizes of layers when trainer.fit() is called
         self.classif = CLASSIFICATION
         self.cnn = CNN(
@@ -189,15 +189,16 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
             self.logger.log_dir,  # pyright: ignore[reportGeneralTypeIssues, reportOptionalMemberAccess]
             "train_img",  # pyright: ignore[reportGeneralTypeIssues]
         )
+        printer = Visualize()
         # Two plots, first one for the train and the second for the test images
-        plot_img(
+        printer.plot_img(
             patient_idx=int(train_index.item()),
             output=y_train_reg_hat[0],
             path=path,
             coll_angle_hat=y_cls_hat,
             single_fig=True,
         )
-        plot_img(
+        printer.plot_img(
             patient_idx=int(test_idx.item()),
             output=y_reg_hat[0],
             path=self.logger.log_dir,  # pyright: ignore[reportGeneralTypeIssues,reportOptionalMemberAccess]
