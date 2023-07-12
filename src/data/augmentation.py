@@ -91,24 +91,30 @@ class Augmentation:
         )
 
         # Array of trasformations from which we sample
-        augment = [
-            iaa.Fliplr(
-                p=1,
-                seed=42,
+        sometimes = lambda aug: iaa.Sometimes(0.7, aug)
+        seq = [
+            sometimes(
+                iaa.Fliplr(
+                    p=1,
+                    seed=42,
+                )
             ),
-            iaa.Affine(translate_percent={"x": (-0.1, 0.1), "y": (-0.1, 0.1)}),
-            iaa.ElasticTransformation(alpha=100, sigma=10),
-            iaa.Cutout(
-                nb_iterations=(2, 5),
-                size=0.1,
-                squared=False,
-                fill_mode="constant",
-                cval=0,
+            sometimes(
+                iaa.Affine(translate_percent={"x": (-0.1, 0.1), "y": (-0.1, 0.1)})
+            ),
+            sometimes(iaa.ElasticTransformation(alpha=100, sigma=10)),
+            sometimes(
+                iaa.Cutout(
+                    nb_iterations=(2, 5),
+                    size=0.1,
+                    squared=False,
+                    fill_mode="constant",
+                    cval=0,
+                )
             ),
         ]
         for i, aug_index in enumerate(image_indices):
-            augment_choice = random.sample(population=augment, k=3)
-            seq = iaa.Sequential(augment_choice)
+            seq = iaa.Sequential(seq)
             mask2d = self.masks[aug_index]
             iso_pix = original_dim_iso[aug_index]
             iso_kps_img = KeypointsOnImage(

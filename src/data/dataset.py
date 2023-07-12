@@ -21,7 +21,8 @@ class Dataset:
         self.jaws_Y_pix = np.load(r"data\interim\jaws_Y_pix.npy")  # shape=(N, 12, 2)
         self.angles = np.load(r"data\interim\angles.npy")  # shape=(N, 12)
         self.angle_class = np.where(self.angles[:, 0] == 90, 0.0, 1.0)  # shape=(N,)
-        self.df_patient_info = pd.read_csv(r"data\patient_info.csv")
+        self.df_patient_info_original = pd.read_csv(r"data\patient_info.csv")
+        self.df_patient_info = self.df_patient_info_original
 
     def normalize_ptv_hu(self, background=-1) -> None:
         """Normalize the channel corresponding to the PTV HU density.
@@ -116,7 +117,7 @@ class Dataset:
             self.jaws_X_pix,
             self.jaws_Y_pix,
             self.angles,
-            self.df_patient_info,
+            self.df_patient_info_original,
         )
 
         (
