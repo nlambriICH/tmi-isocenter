@@ -21,7 +21,6 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
         mse_loss_weight=5.0,
         bcelogits_loss_weight=0.00000001,
         weight=1,
-        activation=nn.ReLU(),
         focus_on=[0, 1],
         filters=4,
         output=39,
@@ -41,7 +40,6 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
             filters,
             output,
             self.classif,
-            activation,
         )
         self.accuracy = BinaryAccuracy()
         self.learning_rate = learning_rate
@@ -129,8 +127,6 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
             batch_idx (int): batch index
         """
         x, y_reg, y_cls = batch
-        # need additional (batch) dimension because Flatten layer has start_dim=1
-        # x = x.unsqueeze_(0)  # shape=(1, 1, 512, 512)
         y_reg = y_reg.view(1, -1)  # shape=(1, N_out)
         y_cls = y_cls.view(1, -1)  # shape=(1, 1)
 

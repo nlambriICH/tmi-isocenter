@@ -57,12 +57,13 @@ class Dataset:
         norm_ptv = np.zeros_like(self.masks2d)
         for i, mask2 in enumerate(self.masks2d):
             mask_hu = mask2[0]
-            non_zero_values = mask_hu[mask_hu != 0]
+            mask = mask2[1] / 0.3
+            non_zero_values = mask_hu[np.nonzero(mask)]
             min_value = np.min(non_zero_values) if background == -1 else np.min(mask_hu)
             max_value = np.max(non_zero_values) if background == -1 else np.max(mask_hu)
             difference = max_value - min_value
             normalized = (
-                np.where(mask_hu != 0, (mask_hu - min_value) / difference, background)
+                np.where(mask != 0, (mask_hu - min_value) / difference, background)
                 if background == -1
                 else (mask_hu - min_value) / difference
             )

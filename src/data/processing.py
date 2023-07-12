@@ -58,7 +58,9 @@ class Processing:
 
         jaws_Y_pix_aug = np.zeros_like(self.jaws_Y_pix)
 
-        resize = iaa.Resize(size={"height": 512, "width": width_resize})
+        resize = iaa.Resize(
+            size={"height": 512, "width": width_resize}, interpolation="nearest"
+        )
 
         for i, (mask2d, iso_pix, jaw_Y_pix) in enumerate(
             zip(self.masks, self.isocenters_pix, self.jaws_Y_pix)
@@ -179,7 +181,9 @@ class Processing:
             zip(self.masks, self.isocenters_pix, self.jaws_Y_pix, self.original_sizes)
         ):
             # Keypoint x: column-wise == dicom-z, keypoint y: row-wise == dicom-x
-            resize = iaa.Resize(size={"height": 512, "width": width_resize})
+            resize = iaa.Resize(
+                size={"height": 512, "width": width_resize}, interpolation="nearest"
+            )
             iso_kps_img = KeypointsOnImage(
                 [Keypoint(x=iso[2], y=iso[0]) for iso in iso_pix],
                 shape=mask2d.shape,
@@ -319,7 +323,10 @@ class Processing:
         ):
             aug = iaa.Sequential(
                 [
-                    iaa.Resize(size={"height": 512, "width": width_resize}),
+                    iaa.Resize(
+                        size={"height": 512, "width": width_resize},
+                        interpolation="nearest",
+                    ),
                     iaa.Rot90(k=-1, keep_size=False),
                 ]
             )
@@ -377,7 +384,10 @@ class Processing:
             aug = iaa.Sequential(
                 [
                     iaa.Rot90(k=1, keep_size=False),
-                    iaa.Resize(size={"height": 512, "width": width_resize}),
+                    iaa.Resize(
+                        size={"height": 512, "width": width_resize},
+                        interpolation="nearest",
+                    ),
                 ]
             )
             # Swap columns to original dicom coordinate system

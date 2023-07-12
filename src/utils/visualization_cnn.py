@@ -24,13 +24,6 @@ class Visualize:
         self.jaws_Y_pix = np.load(r"data\raw\jaws_Y_pix.npy")
         self.coll_angles = np.load(r"data\raw\angles.npy")
         self.df_patient_info = pd.read_csv(r"data\patient_info.csv")
-        if MODEL == "arms":
-            iso_on_arms = self.df_patient_info["IsocenterOnArms"].to_numpy()
-            bool_arms = iso_on_arms.astype(bool)
-
-        elif MODEL == "body":
-            iso_on_arms = self.df_patient_info["IsocenterOnArms"].to_numpy()
-            bool_arms = ~iso_on_arms.astype(bool)
 
     def build_output(
         self, y_hat: torch.Tensor, patient_idx: int, aspect_ratio: float
@@ -520,42 +513,45 @@ class Visualize:
         processing_output.original_sizes = [processing_raw.original_sizes[patient_idx]]
         processing_output.inverse_trasform()
 
+        # Here, the isocenter on the backbone is shifted, followed by adjusting the relative fields.
         start_value, x_right, y_right, x_left, y_left = self.find_fields_coor(
             patient_idx,
             self.ptv_masks[patient_idx],
             processing_output.isocenters_pix[0],
         )
+        # Shift the arms model isocenters
         if (
             x_right  # -(x_right - x_left) / 4 To think about it, I prefer don't shift it too many times.
             < (processing_output.isocenters_pix[0][2, 2])
             < (x_right + (x_right - x_left) / 2)
             or x_left > (processing_output.isocenters_pix[0][2, 2])
         ) and MODEL == "arms":
-            # Shifting the isocenter when it is in the region defined above
-
+            # Setting the isocenter for arms model at 3/4 space for the
             processing_output.isocenters_pix[0][2, 2] = (
                 x_left + (x_right - x_left) * 3 / 4
             )
             processing_output.isocenters_pix[0][3, 2] = (
                 x_left + (x_right - x_left) * 3 / 4
             )
+            # Fixing the fields with minimum overlap, after the isocenter shift
             processing_output.jaws_X_pix[0][2, 1] = (
-                processing_output.isocenters_pix[0][4, 2]
+                processing_output.isocenters_pix[0][6, 2]
                 - processing_output.isocenters_pix[0][2, 2]
                 + 0.01
-            ) * aspect_ratio + processing_output.jaws_X_pix[0][
-                3, 0
-            ]  # abdom
+            ) * aspect_ratio + processing_output.jaws_X_pix[0][3, 0]
+
+        # Shifting the body model isocenters
         if (
             (x_left - (x_right - x_left) / 2)
             < (processing_output.isocenters_pix[0][2, 2])
             < (x_left + (x_right - x_left) / 2)
         ) and MODEL == "body":
-            # Shifting the isocenter when it is in the region defined above
+            # Shifting the isocenter when it is in the neighborhood above, the jaws are fixed after.
             processing_output.isocenters_pix[0][2, 2] = x_left - 10
             processing_output.isocenters_pix[0][3, 2] = x_left - 10
+
+        # For both the models, if the isocenter is on the backbone.
         if x_left < processing_output.isocenters_pix[0][2, 2] < x_right:
-            # Setting isocenter's fields over the backbone
             processing_output.jaws_X_pix[0][2, 0] = (
                 (x_left - processing_output.isocenters_pix[0][2, 2] + 1)
                 * aspect_ratio
@@ -566,8 +562,11 @@ class Visualize:
                 * aspect_ratio
                 / 2
             )
+
+        # if processing_output.isocenters_pix[0][2, 2] < x_left here i fix the Jaws aperture.
         self.fields_on_backbone(aspect_ratio, processing_output, x_right, x_left)
-        # splitting the distance between the two last iso.
+
+        # splitting the distance between the two last iso only for body model
         if MODEL == "body" and processing_output.isocenters_pix[0][2, 2] < x_left:
             translation = 0.5 * (
                 (
@@ -588,6 +587,7 @@ class Visualize:
                 )
             )
 
+            # Couple of isocenters on pelvi
             processing_output.isocenters_pix[0][2, 2] = (
                 processing_output.isocenters_pix[0][0, 2]
                 + processing_output.jaws_X_pix[0][1, 1] / aspect_ratio
@@ -600,6 +600,8 @@ class Visualize:
                 + translation
                 - processing_output.jaws_X_pix[0][3, 0] / aspect_ratio
             )
+
+            # Couple of isocenter on the abdom
             processing_output.isocenters_pix[0][4, 2] = (
                 processing_output.isocenters_pix[0][3, 2]
                 + processing_output.isocenters_pix[0][6, 2]
@@ -608,7 +610,11 @@ class Visualize:
                 processing_output.isocenters_pix[0][3, 2]
                 + processing_output.isocenters_pix[0][6, 2]
             ) / 2
+
+            # After this shift I need to check and correct the X_jaws again
             self.fields_on_backbone(aspect_ratio, processing_output, x_right, x_left)
+
+        # Similar check on arms model, and fixing the X_jaws on the backbone
         if processing_output.isocenters_pix[0][2, 2] > x_right:
             if MODEL == "arms":
                 processing_output.jaws_X_pix[0][0, 1] = (
@@ -843,8 +849,7 @@ class Visualize:
     def find_fields_coor(
         self, pat_index: int, masks_int: np.ndarray, iso: np.ndarray
     ) -> tuple[int, int, int, int, int]:
-        df_patient_info = pd.read_csv(r"D:\tmi-isocenter-1\data\patient_info.csv")
-        iso_on_arms = df_patient_info["IsocenterOnArms"].to_numpy()
+        iso_on_arms = self.df_patient_info["IsocenterOnArms"].to_numpy()
         bool_arms = iso_on_arms.astype(bool)
 
         def loss_fun(pos_new):
