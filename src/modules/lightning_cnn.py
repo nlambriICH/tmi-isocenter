@@ -1,7 +1,6 @@
 """Lightning module for CNN training"""
 import os
 import torch
-from torch import nn
 import torch.nn.functional as F
 import lightning.pytorch as pl
 from torch.optim.lr_scheduler import ReduceLROnPlateau
@@ -185,16 +184,16 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
             self.logger.log_dir,  # pyright: ignore[reportGeneralTypeIssues, reportOptionalMemberAccess]
             "train_img",  # pyright: ignore[reportGeneralTypeIssues]
         )
-        printer = Visualize()
+        viz = Visualize()
         # Two plots, first one for the train and the second for the test images
-        printer.plot_img(
+        viz.plot_img(
             patient_idx=int(train_index.item()),
             output=y_train_reg_hat[0],
             path=path,
             coll_angle_hat=y_cls_hat,
             single_fig=True,
         )
-        printer.plot_img(
+        viz.plot_img(
             patient_idx=int(test_idx.item()),
             output=y_reg_hat[0],
             path=self.logger.log_dir,  # pyright: ignore[reportGeneralTypeIssues,reportOptionalMemberAccess]

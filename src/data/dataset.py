@@ -1,10 +1,7 @@
 """Dataset utility functions"""
-from typing import Literal
-import traceback
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
-from src.config.constants import MODEL
 from src.data.augmentation import Augmentation
 
 
@@ -12,17 +9,8 @@ class Dataset:
     """Dataset class to load and stratify data"""
 
     def __init__(self) -> None:
-        with np.load(r"data\interim\masks2D.npz") as npz_masks2d:  # shape=(N, 512, z)
-            try:
-                self.masks2d = np.array(list(npz_masks2d.values()))
-                self.masks2d = np.transpose(self.masks2d, (0, 3, 1, 2))
-
-                self.masks2d = self.normalize_ptv()
-            except ValueError:
-                traceback.print_exc()
-                print(
-                    "Could not create NumPy array of masks. Please ensure they are square matrices."
-                )
+        self.masks2d = np.transpose(np.load(r"data\interim\masks2D.npy"), (0, 3, 1, 2))
+        self.normalize_ptv_hu()
         self.num_patients = self.masks2d.shape[0]
 
         self.isocenters_pix = np.load(
@@ -35,15 +23,15 @@ class Dataset:
         self.angle_class = np.where(self.angles[:, 0] == 90, 0.0, 1.0)  # shape=(N,)
         self.df_patient_info = pd.read_csv(r"data\patient_info.csv")
 
-    def normalize_ptv(self, background=-1) -> np.ndarray:
-        """Normalize the channel correspondin to the PTV HU density.
+    def normalize_ptv_hu(self, background=-1) -> None:
+        """Normalize the channel corresponding to the PTV HU density.
 
         Parameters:
             self (object): The instance of the class containing the masks.
             background (int): Background value used for normalization. Default is -1.
 
         Returns:
-            np.ndarray: A numpy array containing the normalized masks.
+            None
 
         Description:
             This function normalizes the HU mask of the PTV by applying a min-max normalization.
@@ -54,23 +42,20 @@ class Dataset:
             Otherwise, if `background` is set to -1, the entire mask range is considered for normalization.
             The resulting normalized masks are stored in a new numpy array `norm_ptv` which is returned.
         """
-        norm_ptv = np.zeros_like(self.masks2d)
         for i, mask2 in enumerate(self.masks2d):
             mask_hu = mask2[0]
-            mask = mask2[1] / 0.3
-            non_zero_values = mask_hu[np.nonzero(mask)]
+            mask_ptv = mask2[1]
+            non_zero_values = mask_hu[np.nonzero(mask_ptv)]
             min_value = np.min(non_zero_values) if background == -1 else np.min(mask_hu)
             max_value = np.max(non_zero_values) if background == -1 else np.max(mask_hu)
             difference = max_value - min_value
             normalized = (
-                np.where(mask != 0, (mask_hu - min_value) / difference, background)
+                np.where(mask_ptv != 0, (mask_hu - min_value) / difference, background)
                 if background == -1
                 else (mask_hu - min_value) / difference
             )
-            norm_ptv[i, 0] = normalized
-            norm_ptv[i, 1] = mask2[1]
-            norm_ptv[i, 2] = mask2[2]
-        return norm_ptv
+
+            self.masks2d[i, 0] = normalized
 
     def train_val_test_split(
         self,
@@ -124,7 +109,16 @@ class Dataset:
         return (train_idx, val_idx, test_idx)
 
     def augment_train(self):
-        aug = Augmentation(self.masks2d, self.train_idx)
+        aug = Augmentation(
+            self.masks2d,
+            self.train_idx,
+            self.isocenters_pix,
+            self.jaws_X_pix,
+            self.jaws_Y_pix,
+            self.angles,
+            self.df_patient_info,
+        )
+
         (
             self.masks2d,
             self.isocenters_pix,
@@ -133,7 +127,8 @@ class Dataset:
             self.angle_class,
             self.df_patient_info,
             train_index,
-        ) = aug.flip_translate_augmentation()
+        ) = aug.augment_affine()
+
         self.num_patients = self.masks2d.shape[0]
         return train_index
 

@@ -12,28 +12,34 @@ from src.config.constants import MODEL
 class Augmentation:
     """Dataset class to augment data"""
 
-    def __init__(self, masks: list[np.ndarray], train_indexes: np.ndarray) -> None:
+    def __init__(
+        self,
+        masks: np.ndarray,
+        train_indexes: np.ndarray,
+        isocenters_pix: np.ndarray,
+        jaws_X_pix: np.ndarray,
+        jaws_Y_pix: np.ndarray,
+        angles: np.ndarray,
+        df_patient_info: pd.DataFrame,
+    ) -> None:
         self.masks = masks
-        self.isocenters_pix = np.load(
-            r"data\interim\isocenters_pix.npy"
-        )  # shape=(N, 12, 3)
+        self.isocenters_pix = isocenters_pix
         self.train_indexes = train_indexes
         self.train_masks = masks[train_indexes]
         self.train_iso = self.isocenters_pix[train_indexes]
-        self.num_patients = self.train_masks.shape[0]
-        self.jaws_X_pix = np.load(r"data\interim\jaws_X_pix.npy")  # shape=(N, 12, 2)
-        self.jaws_Y_pix = np.load(r"data\interim\jaws_Y_pix.npy")  # shape=(N, 12, 2)
-        self.angles = np.load(r"data\interim\angles.npy")  # shape=(N, 12)
-        self.angle_class = np.where(self.angles[:, 0] == 90, 0.0, 1.0)  # shape=(N,)
-        self.df_patient_info = pd.read_csv(r"data\patient_info.csv")
+        self.num_patients_train = self.train_masks.shape[0]
+        self.jaws_X_pix = jaws_X_pix
+        self.jaws_Y_pix = jaws_Y_pix
+        self.angles = angles
+        self.angle_class = np.where(self.angles[:, 0] == 90, 0.0, 1.0)
+        self.df_patient_info = df_patient_info
         self.train_affine = self.train_indexes
-        # Define the number of images you want to augment
         if MODEL == "body":
-            self.num_images_to_augment = 100
+            self.num_images_to_augment = int(self.num_patients_train * 1.5)
         else:
-            self.num_images_to_augment = 75
+            self.num_images_to_augment = int(self.num_patients_train * 2.0)
 
-    def flip_translate_augmentation(
+    def augment_affine(
         self,
     ) -> tuple[
         np.ndarray,
@@ -146,9 +152,7 @@ class Augmentation:
         # fixing dataset
         rows_aug = self.df_patient_info.iloc[image_indices]
         df_patient_info_aug = self.df_patient_info.append(rows_aug)
-        # TO DO
-        # Maybe here I can save the new df_patient, thus I can use it in Visualize
-        # To print the train images augmented
+
         return (
             self.masks,
             self.isocenters_pix,

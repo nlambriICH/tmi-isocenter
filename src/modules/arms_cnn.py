@@ -1,5 +1,4 @@
 """Lightning module for CNN training"""
-from torch import nn
 from src.modules.lightning_cnn import LitCNN
 
 

@@ -457,9 +457,7 @@ class Processing:
         if not os.path.exists(r"data\interim"):
             os.makedirs(r"data\interim")
 
-        np.savez(
-            r"data\interim\masks2D.npz", *self.masks
-        )  # unpack the list to pass the mask2D arrays as positional arguments
+        np.save(r"data\interim\masks2D.npy", np.array(self.masks))
         np.save(r"data\interim\isocenters_pix.npy", self.isocenters_pix)
         np.save(r"data\interim\jaws_X_pix.npy", self.jaws_X_pix)
         np.save(r"data\interim\jaws_Y_pix.npy", self.jaws_Y_pix)

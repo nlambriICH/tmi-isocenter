@@ -1,6 +1,5 @@
 """Lightning module for CNN training"""
 import torch
-from torch import nn
 import torch.nn.functional as F
 from src.modules.lightning_cnn import LitCNN
 
