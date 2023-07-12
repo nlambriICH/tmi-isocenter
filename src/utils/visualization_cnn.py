@@ -18,7 +18,7 @@ class Visualize:
         with np.load(r"data\raw\ptv_masks2D.npz") as npz_masks2d:
             self.ptv_masks = list(npz_masks2d.values())
         with np.load(r"data\raw\ptv_imgs2D.npz") as npz_masks2d:
-            self.ptvs = list(npz_masks2d.values())
+            self.ptv_hu = list(npz_masks2d.values())
         self.isocenters_pix = np.load(r"data\raw\isocenters_pix.npy")
         self.jaws_X_pix = np.load(r"data\raw\jaws_X_pix.npy")
         self.jaws_Y_pix = np.load(r"data\raw\jaws_Y_pix.npy")
@@ -29,20 +29,19 @@ class Visualize:
         self, y_hat: torch.Tensor, patient_idx: int, aspect_ratio: float
     ) -> torch.Tensor:
         output = np.zeros(shape=(84))
-        if y_hat.shape[0] == 39:
-            # Isocenter indexes
-            index_X = [0, 3, 6, 9, 12, 15, 18, 21, 24, 27]
-            index_Y = [1, 4, 7, 10, 13, 16, 19, 22, 25, 28]
-            output[index_X] = self.find_x_coord(
-                self.ptvs[patient_idx]
-            )  # x coord repeated 8 times + 2 times for iso thorax
-            output[
-                index_Y
-            ] = 100  # y coord repeated 8 times + 2 times for iso thorax, setted to 0
+
+        # Isocenter indexes
+        index_X = [0, 3, 6, 9, 12, 15, 18, 21, 24, 27]
+        index_Y = [1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34]
+        output[index_X] = self.find_x_coord(
+            self.ptv_hu[patient_idx]
+        )  # x coord repeated 8 times + 2 times for iso thorax
+        output[
+            index_Y
+        ] = 100  # y coord repeated 8 times + 2 times for iso thorax, set to 0
+
+        if y_hat.shape[0] == 39:  # whole model
             output[30] = y_hat[0].item()  # x coord right arm
-            output[
-                [31, 34]
-            ] = 100  # y coord for arms repeated twice, also constrained to 0
             output[33] = y_hat[1].item()  # x coord left arm
 
             for z in range(6):  # z coords
@@ -91,20 +90,9 @@ class Visualize:
                     output[81 + 2 * i] = -y_hat[37 + i].item()
 
                 output[76 + i] = y_hat[33 + i].item()  # apertures for the head
-        if y_hat.shape[0] == 32:  # ARMS CASE, can be switched in if MODEL == "arms"
-            # Isocenter indexes
-            index_X = [0, 3, 6, 9, 12, 15, 18, 21, 24, 27]
-            index_Y = [1, 4, 7, 10, 13, 16, 19, 22, 25, 28]
-            output[index_X] = self.find_x_coord(
-                self.ptvs[patient_idx]
-            )  # x coord repeated 8 times + 2 times for iso thorax
-            output[
-                index_Y
-            ] = 100  # y coord repeated 8 times + 2 times for iso thorax, setted to 100
+
+        elif y_hat.shape[0] == 32:  # arms model
             output[30] = y_hat[0].item()  # x coord right arm
-            output[
-                [31, 34]
-            ] = 100  # y coord for arms repeated twice, also constrained to 100
             output[33] = y_hat[1].item()  # x coord left arm
 
             for z in range(2):  # first two z coords
@@ -117,7 +105,7 @@ class Visualize:
                 output[(z + 3) * 3 * 2 + 5] = y_hat[z + 4].item()
 
             # Begin jaw_X
-            # 4 Legs + 3 Pelvi
+            # 4 legs + 3 pelvis
             for i in range(5):
                 output[36 + i] = y_hat[
                     7 + i
@@ -132,10 +120,8 @@ class Visualize:
             output[50] = y_hat[15].item()  # add in groups of three avoiding repetitions
 
             for i in range(3):
-                # Head
-                output[52 + i] = y_hat[16 + i].item()
-                # Arms
-                output[56 + i] = y_hat[19 + i].item()
+                output[52 + i] = y_hat[16 + i].item()  # head
+                output[56 + i] = y_hat[19 + i].item()  # arms
 
             # Symmetric apertures
             output[47] = -output[44]
@@ -144,10 +130,10 @@ class Visualize:
 
             output[59] = y_hat[22].item()
             # Overlap fields
-            norm = aspect_ratio * self.ptvs[patient_idx].shape[1] / 512
+            norm = aspect_ratio * self.ptv_hu[patient_idx].shape[1] / 512
             output[41] = (y_hat[3].item() - y_hat[4].item() + 0.01) * norm + output[
                 50
-            ]  # abdom
+            ]  # abdomen
             output[49] = (y_hat[4].item() - y_hat[5].item() + 0.03) * norm + output[
                 54
             ]  # chest
@@ -174,28 +160,9 @@ class Visualize:
                     output[81 + 2 * i] = -y_hat[30 + i].item()
 
                 output[76 + i] = y_hat[26 + i].item()  # apertures for the head
-        if y_hat.shape[0] == 25:
-            norm = aspect_ratio * self.ptvs[patient_idx].shape[1] / 512
-            # Isocenter indexes
-            index_X = [
-                0,
-                3,
-                6,
-                9,
-                12,
-                15,
-                18,
-                21,
-                24,
-                27,
-            ]
-            index_Y = [1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34]
-            output[index_X] = self.find_x_coord(
-                self.ptvs[patient_idx]
-            )  # x coord repeated 8 times + 2 times for iso thorax
-            output[
-                index_Y
-            ] = 100  # y coord repeated 8 times + 2 times for iso thorax, setted to 0
+
+        elif y_hat.shape[0] == 25:
+            norm = aspect_ratio * self.ptv_hu[patient_idx].shape[1] / 512
             output[30] = 0  # x coord right arm
             output[33] = 0  # x coord left arm
 
@@ -211,13 +178,11 @@ class Visualize:
 
             # Begin jaw_X
             for i in range(5):
-                output[36 + i] = y_hat[4 + i].item()  # 4 legs+ down field 4th iso
+                output[36 + i] = y_hat[4 + i].item()  # 4 legs + down field 4th iso
             for i in range(3):
                 output[42 + i] = y_hat[9 + i].item()  # 2 4th iso + down field 3rd iso
-                # head fields
-                output[52 + i] = y_hat[15 + i].item()
-                # arms fields
-                output[56 + i] = 0
+                output[52 + i] = y_hat[15 + i].item()  # head fields
+                output[56 + i] = 0  # arms fields
 
             # chest
             output[46] = y_hat[12]  # third iso
@@ -230,14 +195,10 @@ class Visualize:
             output[49] = (output[20] - output[26] + 0.02) * norm + output[54]  # chest
 
             # Symmetric apertures
-            # third iso
-            output[47] = -output[44]
-            # chest
-            output[51] = -output[48]
-            # head
-            output[55] = -output[52]
-            # arms
-            output[59] = 0
+            output[47] = -output[44]  # third iso
+            output[51] = -output[48]  # chest
+            output[55] = -output[52]  # head
+            output[59] = 0  # arms
 
             # Begin jaw_Y
             for i in range(4):
@@ -247,7 +208,7 @@ class Visualize:
                     output[61 + 2 * i] = -y_hat[i + 18].item()
 
                     # 4 fields with equal (and opposite) apertures
-                    # Pelvi
+                    # Pelvis
                     output[64 + 2 * i] = y_hat[20].item()
                     output[65 + 2 * i] = -y_hat[20].item()
                     # Third iso
@@ -263,7 +224,7 @@ class Visualize:
 
                 output[76 + i] = y_hat[21 + i].item()  # apertures for the head
 
-        return torch.Tensor(output)
+        return torch.from_numpy(output)
 
     def extract_original_data(
         self,
@@ -297,7 +258,7 @@ class Visualize:
                     jaws_X_pix_hat[i, j] = output[36 + 2 * i + j]
                     jaws_Y_pix_hat[i, j] = output[60 + 2 * i + j]
 
-        return (isocenters_hat, jaws_X_pix_hat, jaws_Y_pix_hat)
+        return isocenters_hat, jaws_X_pix_hat, jaws_Y_pix_hat
 
     def add_rectangle_patch(
         self,
@@ -482,7 +443,7 @@ class Visualize:
         )
 
         processing_raw = Processing(
-            self.ptvs,
+            self.ptv_hu,
             self.isocenters_pix,
             self.jaws_X_pix,
             self.jaws_Y_pix,
@@ -490,6 +451,7 @@ class Visualize:
         )
         processing_raw.resize()
         processing_raw.rotate_90()
+
         isocenters_hat = isocenters_hat[np.newaxis]
         jaws_X_pix_hat = jaws_X_pix_hat[np.newaxis]
         jaws_Y_pix_hat = jaws_Y_pix_hat[np.newaxis]
@@ -501,8 +463,9 @@ class Visualize:
         if MODEL != "body":
             angles[10] = 355
             angles[11] = 5
+
         processing_output = Processing(
-            [processing_raw.masks[patient_idx]],  # resized mask
+            [processing_raw.masks[patient_idx]],  # resize-rotate image
             isocenters_hat,
             jaws_X_pix_hat,
             jaws_Y_pix_hat,
@@ -877,7 +840,7 @@ class Visualize:
 
         start_value = opt.best_value[0]
         min = 512
-        backbone = int(self.find_x_coord(self.ptvs[pat_index]) * masks_int.shape[0])
+        backbone = int(self.find_x_coord(self.ptv_hu[pat_index]) * masks_int.shape[0])
         y_pixels = np.concatenate(
             (
                 np.arange(backbone - 115, backbone - 50),
