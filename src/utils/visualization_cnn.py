@@ -395,6 +395,7 @@ class Visualize:
 
     def plot_img(
         self,
+        img_interim: np.ndarray,
         patient_idx: int,
         output: torch.Tensor,
         path: str,
@@ -430,10 +431,16 @@ class Visualize:
         slice_tickness_col_idx = self.df_patient_info.columns.get_loc(
             key="SliceThickness"
         )
+        original_sizes_col_idx = self.df_patient_info.columns.get_loc(
+            key="OrigMaskShape_z"
+        )
         pix_spacing = self.df_patient_info.iloc[patient_idx, pix_spacing_col_idx]
         slice_thickness = self.df_patient_info.iloc[patient_idx, slice_tickness_col_idx]
         aspect_ratio = (
             slice_thickness / pix_spacing
+        )  # pyright: ignore[reportGeneralTypeIssues]
+        original_size = int(
+            self.df_patient_info.iloc[patient_idx, original_sizes_col_idx]
         )  # pyright: ignore[reportGeneralTypeIssues]
         if output.shape[0] < 84:
             output = self.build_output(output, patient_idx, aspect_ratio)
@@ -442,15 +449,15 @@ class Visualize:
             output
         )
 
-        processing_raw = Processing(
-            self.ptv_hu,
-            self.isocenters_pix,
-            self.jaws_X_pix,
-            self.jaws_Y_pix,
-            self.coll_angles,
-        )
-        processing_raw.resize()
-        processing_raw.rotate_90()
+        """        processing_raw = Processing(
+                    self.ptv_hu,
+                    self.isocenters_pix,
+                    self.jaws_X_pix,
+                    self.jaws_Y_pix,
+                    self.coll_angles,
+                )"""
+        """        processing_raw.resize()
+                processing_raw.rotate_90()"""
 
         isocenters_hat = isocenters_hat[np.newaxis]
         jaws_X_pix_hat = jaws_X_pix_hat[np.newaxis]
@@ -465,7 +472,7 @@ class Visualize:
             angles[11] = 5
 
         processing_output = Processing(
-            [processing_raw.masks[patient_idx]],  # resize-rotate image
+            [img_interim],  # interim image
             isocenters_hat,
             jaws_X_pix_hat,
             jaws_Y_pix_hat,
@@ -473,7 +480,7 @@ class Visualize:
         )
 
         # Retrieve information of the original shape
-        processing_output.original_sizes = [processing_raw.original_sizes[patient_idx]]
+        processing_output.original_sizes = [original_size]
         processing_output.inverse_trasform()
 
         # Here, the isocenter on the backbone is shifted, followed by adjusting the relative fields.
@@ -586,14 +593,11 @@ class Visualize:
                 processing_output.jaws_X_pix[0][3, 0] = (
                     (x_left - processing_output.isocenters_pix[0][2, 2]) + 1
                 ) * aspect_ratio
-        processing_raw.inverse_rotate_90()
-        processing_raw.inverse_resize()
 
         if single_fig:
             self.single_figure_plot(
                 patient_idx,
                 path,
-                processing_raw,
                 processing_output,
                 pix_spacing,  # pyright: ignore[reportGeneralTypeIssues]
                 slice_thickness,  # pyright: ignore[reportGeneralTypeIssues]
@@ -602,7 +606,6 @@ class Visualize:
             self.separate_plots(
                 patient_idx,
                 path,
-                processing_raw,
                 processing_output,
                 pix_spacing,  # pyright: ignore[reportGeneralTypeIssues]
                 slice_thickness,  # pyright: ignore[reportGeneralTypeIssues]
@@ -622,7 +625,6 @@ class Visualize:
         self,
         patient_idx: int,
         path: str,
-        processing_raw: Processing,
         processing_output: Processing,
         pix_spacing: float,
         slice_thickness: float,
@@ -646,10 +648,8 @@ class Visualize:
         """
         aspect_ratio = slice_thickness / pix_spacing
 
-        plt.imshow(
-            processing_raw.masks[patient_idx], cmap="gray", aspect=1 / aspect_ratio
-        )
-        plt.contourf(processing_raw.masks[patient_idx], alpha=0.25)
+        plt.imshow(self.ptv_hu[patient_idx], cmap="gray", aspect=1 / aspect_ratio)
+        plt.contourf(self.ptv_hu[patient_idx], alpha=0.25)
 
         plt.scatter(
             processing_output.isocenters_pix[0, :, 2],
@@ -669,16 +669,16 @@ class Visualize:
 
         # Plot ground thruth
         plt.scatter(
-            processing_raw.isocenters_pix[patient_idx, :, 2],
-            processing_raw.isocenters_pix[patient_idx, :, 0],
+            self.isocenters_pix[patient_idx, :, 2],
+            self.isocenters_pix[patient_idx, :, 0],
             color="blue",
             s=7,
         )
         self.plot_fields(
             plt.gca(),
-            processing_raw.isocenters_pix[patient_idx],
-            processing_raw.jaws_X_pix[patient_idx],
-            processing_raw.jaws_Y_pix[patient_idx],
+            self.isocenters_pix[patient_idx],
+            self.jaws_X_pix[patient_idx],
+            self.jaws_Y_pix[patient_idx],
             self.coll_angles[patient_idx],
             slice_thickness,
             pix_spacing,
@@ -702,7 +702,6 @@ class Visualize:
         self,
         patient_idx: int,
         path: str,
-        processing_raw: Processing,
         processing_output: Processing,
         pix_spacing: float,
         slice_thickness: float,
@@ -729,9 +728,7 @@ class Visualize:
         aspect_ratio = slice_thickness / pix_spacing
 
         # Plot predictions
-        plt.imshow(
-            processing_raw.masks[patient_idx], cmap="gray", aspect=1 / aspect_ratio
-        )
+        plt.imshow(self.ptv_hu[patient_idx], cmap="gray", aspect=1 / aspect_ratio)
         # plt.contourf(processing_raw.masks[patient_idx], alpha=0.25)
         plt.scatter(
             processing_output.isocenters_pix[0, :, 2],
@@ -760,21 +757,19 @@ class Visualize:
         plt.close()
 
         # Plot ground thruth
-        plt.imshow(
-            processing_raw.masks[patient_idx], cmap="gray", aspect=1 / aspect_ratio
-        )
+        plt.imshow(self.ptv_hu[patient_idx], cmap="gray", aspect=1 / aspect_ratio)
         # plt.contourf(processing_raw.masks[patient_idx], alpha=0.25)
         plt.scatter(
-            processing_raw.isocenters_pix[patient_idx, :, 2],
-            processing_raw.isocenters_pix[patient_idx, :, 0],
+            self.isocenters_pix[patient_idx, :, 2],
+            self.isocenters_pix[patient_idx, :, 0],
             color="blue",
             s=7,
         )
         self.plot_fields(
             plt.gca(),
-            processing_raw.isocenters_pix[patient_idx],
-            processing_raw.jaws_X_pix[patient_idx],
-            processing_raw.jaws_Y_pix[patient_idx],
+            self.isocenters_pix[patient_idx],
+            self.jaws_X_pix[patient_idx],
+            self.jaws_Y_pix[patient_idx],
             self.coll_angles[patient_idx],
             slice_thickness,
             pix_spacing,
@@ -1001,4 +996,4 @@ if __name__ == "__main__":
     assert reconstructed_output.shape[0] == 84
 
     path = "test"
-    test.plot_img(patient_idx, output, path)
+    # test.plot_img(test.ptv_hu[77],patient_idx, output, path) #NEED TO PASS AN IMAGE INTERIM

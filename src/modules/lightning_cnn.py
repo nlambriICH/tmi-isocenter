@@ -1,5 +1,6 @@
 """Lightning module for CNN training"""
 import os
+import numpy as np
 import torch
 import torch.nn.functional as F
 import lightning.pytorch as pl
@@ -185,8 +186,11 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
             "train_img",  # pyright: ignore[reportGeneralTypeIssues]
         )
         viz = Visualize()
+        vis_image_train = x_train.numpy()[0, 0, :, :]
+        vis_image_test = x.numpy()[0, 0, :, :]
         # Two plots, first one for the train and the second for the test images
         viz.plot_img(
+            vis_image_train,
             patient_idx=int(train_index.item()),
             output=y_train_reg_hat[0],
             path=path,
@@ -194,6 +198,7 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
             single_fig=True,
         )
         viz.plot_img(
+            vis_image_test,
             patient_idx=int(test_idx.item()),
             output=y_reg_hat[0],
             path=self.logger.log_dir,  # pyright: ignore[reportGeneralTypeIssues,reportOptionalMemberAccess]
