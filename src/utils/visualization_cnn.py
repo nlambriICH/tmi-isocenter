@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from src.data.processing import Processing
 from scipy import ndimage  # pyright: ignore[reportGeneralTypeIssues]
-from gradient_free_optimizers import RandomSearchOptimizer
+from gradient_free_optimizers import GridSearchOptimizer
 from src.config.constants import MODEL
 
 
@@ -805,30 +805,21 @@ class Visualize:
     ) -> tuple[int, int, int, int, int]:
         iso_on_arms = self.df_patient_info["IsocenterOnArms"].to_numpy().astype(bool)
         ptv_mask = self.ptv_masks[patient_index]
+        if iso_on_arms[patient_index]:
+            a = (iso[0, 2] + iso[2, 2]) / 2
+        else:
+            a = (iso[0, 2] + iso[2, 2]) / 2 + 10
 
-        search_space = {
-            "x_0": np.arange(0, ptv_mask.shape[1], 1),
-        }
+        b = (iso[2, 2] + iso[6, 2]) / 2
+        search_space = {"x_0": np.arange(a, b, 1, dtype=int)}
 
         def loss(pos_new):
             x = pos_new["x_0"]
             score = np.sum(ptv_mask[:, x])
             return -score
 
-        # TODO: this is the search space
-        # TODO: change to GridSearch: step_size=1, n_iter=b-a
-        def constraint(params):
-            if iso_on_arms[patient_index]:
-                a = (iso[0, 2] + iso[2, 2]) / 2
-            else:
-                a = (iso[0, 2] + iso[2, 2]) / 2 + 10
-
-            b = (iso[2, 2] + iso[6, 2]) / 2
-
-            return params["x_0"] > a and params["x_0"] < b
-
-        opt = RandomSearchOptimizer(search_space, constraints=[constraint])
-        opt.search(loss, n_iter=100)
+        opt = GridSearchOptimizer(search_space)
+        opt.search(loss, n_iter=search_space["x_0"].shape[0], verbosity=False)
 
         start_value = opt.best_value[0]
         min = 512
