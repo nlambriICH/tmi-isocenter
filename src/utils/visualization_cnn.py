@@ -38,7 +38,7 @@ class Visualize:
         )  # x coord repeated 8 times + 2 times for iso thorax
         output[
             index_Y
-        ] = 100  # y coord repeated 8 times + 2 times for iso thorax, set to 0
+        ] = 0.5  # y coord repeated 8 times + 2 times for iso thorax, set to 0
 
         if y_hat.shape[0] == 39:  # whole model
             output[30] = y_hat[0].item()  # x coord right arm
@@ -92,8 +92,10 @@ class Visualize:
                 output[76 + i] = y_hat[33 + i].item()  # apertures for the head
 
         elif y_hat.shape[0] == 32:  # arms model
-            output[30] = y_hat[0].item()  # x coord right arm
-            output[33] = y_hat[1].item()  # x coord left arm
+            output[30] = y_hat[0].item()  # z coord right arm
+            output[33] = y_hat[
+                1
+            ].item()  # z coord left arm         #Do I need two coords for the iso z-coord on arms?
 
             for z in range(2):  # first two z coords
                 output[z * 3 * 2 + 2] = y_hat[z + 2].item()
@@ -156,8 +158,12 @@ class Visualize:
                     output[73 + 2 * i] = -y_hat[24].item()
 
                     # Arms apertures with opposite sign
-                    output[80 + 2 * i] = y_hat[30 + i].item()
-                    output[81 + 2 * i] = -y_hat[30 + i].item()
+                    output[80 + 2 * i] = y_hat[
+                        30 + i
+                    ].item()  # this will be changed with 40/512, fixed aperture normalized
+                    output[81 + 2 * i] = -y_hat[
+                        30 + i
+                    ].item()  # this will be changed with 40/512, fixed aperture normalized
 
                 output[76 + i] = y_hat[26 + i].item()  # apertures for the head
 
@@ -847,8 +853,8 @@ class Visualize:
                 min_pos_x_right = best_x_pixel + count
 
         assert (
-            min_pos_x_right == best_x_pixel
-        ), "Optimization has not found correct position"
+            min_pos_x_right != best_x_pixel
+        ), "Optimization has not found the correct position"
 
         min_pos_x_left = best_x_pixel
         min = 512
@@ -872,8 +878,8 @@ class Visualize:
                 min_pos_x_left = best_x_pixel - count
 
         assert (
-            min_pos_x_left == best_x_pixel
-        ), "Optimization has not found correct position"
+            min_pos_x_left != best_x_pixel
+        ), "Optimization has not found the correct position"
 
         return (
             min_pos_x_right,
