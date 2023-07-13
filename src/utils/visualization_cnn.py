@@ -434,14 +434,19 @@ class Visualize:
         original_sizes_col_idx = self.df_patient_info.columns.get_loc(
             key="OrigMaskShape_z"
         )
+
         pix_spacing = self.df_patient_info.iloc[patient_idx, pix_spacing_col_idx]
         slice_thickness = self.df_patient_info.iloc[patient_idx, slice_tickness_col_idx]
         aspect_ratio = (
             slice_thickness / pix_spacing
         )  # pyright: ignore[reportGeneralTypeIssues]
+
         original_size = int(
-            self.df_patient_info.iloc[patient_idx, original_sizes_col_idx]
-        )  # pyright: ignore[reportGeneralTypeIssues]
+            self.df_patient_info.iloc[
+                patient_idx, original_sizes_col_idx
+            ]  # pyright: ignore[reportGeneralTypeIssues]
+        )
+
         if output.shape[0] < 84:
             output = self.build_output(output, patient_idx, aspect_ratio)
 
@@ -449,19 +454,10 @@ class Visualize:
             output
         )
 
-        """        processing_raw = Processing(
-                    self.ptv_hu,
-                    self.isocenters_pix,
-                    self.jaws_X_pix,
-                    self.jaws_Y_pix,
-                    self.coll_angles,
-                )"""
-        """        processing_raw.resize()
-                processing_raw.rotate_90()"""
-
         isocenters_hat = isocenters_hat[np.newaxis]
         jaws_X_pix_hat = jaws_X_pix_hat[np.newaxis]
         jaws_Y_pix_hat = jaws_Y_pix_hat[np.newaxis]
+
         angles = 90 * np.ones(12)
         if round(torch.sigmoid(coll_angle_hat).item()) == 1:
             angles[0] = 355
@@ -483,12 +479,12 @@ class Visualize:
         processing_output.original_sizes = [original_size]
         processing_output.inverse_trasform()
 
-        # Here, the isocenter on the backbone is shifted, followed by adjusting the relative fields.
-        start_value, x_right, y_right, x_left, y_left = self.find_fields_coor(
+        # Local optimization
+        start_value, x_right, y_right, x_left, y_left = self.find_fields_coord(
             patient_idx,
-            self.ptv_masks[patient_idx],
-            processing_output.isocenters_pix[0],
+            processing_output.isocenters_pix[0],  # patient's isocenters
         )
+
         # Shift the arms model isocenters
         if (
             x_right  # -(x_right - x_left) / 4 To think about it, I prefer don't shift it too many times.
@@ -804,38 +800,41 @@ class Visualize:
 
         return x_coord / masks_int.shape[0]  # Normalize the coordinate
 
-    def find_fields_coor(
-        self, pat_index: int, masks_int: np.ndarray, iso: np.ndarray
+    def find_fields_coord(
+        self, patient_index: int, iso: np.ndarray
     ) -> tuple[int, int, int, int, int]:
-        iso_on_arms = self.df_patient_info["IsocenterOnArms"].to_numpy()
-        bool_arms = iso_on_arms.astype(bool)
-
-        def loss_fun(pos_new):
-            x = pos_new["x1"]
-            a1 = np.sum(masks_int[:, x])
-            score = a1
-            return -score
+        iso_on_arms = self.df_patient_info["IsocenterOnArms"].to_numpy().astype(bool)
+        ptv_mask = self.ptv_masks[patient_index]
 
         search_space = {
-            "x1": np.arange(0, masks_int.shape[1], 1),
+            "x_0": np.arange(0, ptv_mask.shape[1], 1),
         }
 
-        def constraint_1(para):
-            a = (iso[0, 2] + iso[2, 2]) / 2 + 10
-            if bool_arms[pat_index] == True:
-                a = (iso[0, 2] + iso[2, 2]) / 2
-            b = (iso[2, 2] + iso[6, 2]) / 2
-            return para["x1"] > a and para["x1"] < b
-            # put one or more constraints inside a list
+        def loss(pos_new):
+            x = pos_new["x_0"]
+            score = np.sum(ptv_mask[:, x])
+            return -score
 
-        constraints_list = [constraint_1]
-        # pass list of constraints to the optimizer
-        opt = RandomSearchOptimizer(search_space, constraints=constraints_list)
-        opt.search(loss_fun, n_iter=100)
+        # TODO: this is the search space
+        # TODO: change to GridSearch: step_size=1, n_iter=b-a
+        def constraint(params):
+            if iso_on_arms[patient_index]:
+                a = (iso[0, 2] + iso[2, 2]) / 2
+            else:
+                a = (iso[0, 2] + iso[2, 2]) / 2 + 10
+
+            b = (iso[2, 2] + iso[6, 2]) / 2
+
+            return params["x_0"] > a and params["x_0"] < b
+
+        opt = RandomSearchOptimizer(search_space, constraints=[constraint])
+        opt.search(loss, n_iter=100)
 
         start_value = opt.best_value[0]
         min = 512
-        backbone = int(self.find_x_coord(self.ptv_hu[pat_index]) * masks_int.shape[0])
+        backbone = int(
+            self.find_x_coord(self.ptv_hu[patient_index]) * ptv_mask.shape[0]
+        )
         y_pixels = np.concatenate(
             (
                 np.arange(backbone - 115, backbone - 50),
@@ -846,10 +845,10 @@ class Visualize:
             count = 0
             flag = True
             for i in range(40):
-                if masks_int[j, opt.best_value[0] + i] == False and flag:
+                if ptv_mask[j, opt.best_value[0] + i] == False and flag:
                     if (
-                        masks_int[j, opt.best_value[0] + i]
-                        == masks_int[j, opt.best_value[0] + i + 1]
+                        ptv_mask[j, opt.best_value[0] + i]
+                        == ptv_mask[j, opt.best_value[0] + i + 1]
                     ):
                         count += 1
                     else:
@@ -857,7 +856,7 @@ class Visualize:
                         flag = False
                     if count == 0:
                         count = 511
-                if masks_int[j, opt.best_value[0] + i] == True and flag:
+                if ptv_mask[j, opt.best_value[0] + i] == True and flag:
                     count = 511
             if min > count:
                 min = count
@@ -870,10 +869,10 @@ class Visualize:
             count = 0
             flag = True
             for i in range(40):
-                if masks_int[j, opt.best_value[0] - i] == False and flag:
+                if ptv_mask[j, opt.best_value[0] - i] == False and flag:
                     if (
-                        masks_int[j, opt.best_value[0] - i]
-                        == masks_int[j, opt.best_value[0] - i - 1]
+                        ptv_mask[j, opt.best_value[0] - i]
+                        == ptv_mask[j, opt.best_value[0] - i - 1]
                     ):
                         count += 1
                     else:
