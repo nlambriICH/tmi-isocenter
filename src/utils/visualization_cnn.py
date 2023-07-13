@@ -480,19 +480,19 @@ class Visualize:
         processing_output.inverse_trasform()
 
         # Local optimization
-        start_value, x_right, y_right, x_left, y_left = self.find_fields_coord(
+        x_right, x_left = self.find_fields_coord(
             patient_idx,
             processing_output.isocenters_pix[0],  # patient's isocenters
         )
 
         # Shift the arms model isocenters
-        if (
-            x_right  # -(x_right - x_left) / 4 To think about it, I prefer don't shift it too many times.
-            < (processing_output.isocenters_pix[0][2, 2])
-            < (x_right + (x_right - x_left) / 2)
-            or x_left > (processing_output.isocenters_pix[0][2, 2])
-        ) and MODEL == "arms":
-            # Setting the isocenter for arms model at 3/4 space for the
+        if MODEL == "arms" and (
+            x_right
+            < processing_output.isocenters_pix[0][2, 2]
+            < x_right + (x_right - x_left) / 2
+            or x_left > processing_output.isocenters_pix[0][2, 2]
+        ):
+            # Setting the isocenters for arms model at 3/4 space
             processing_output.isocenters_pix[0][2, 2] = (
                 x_left + (x_right - x_left) * 3 / 4
             )
@@ -503,15 +503,15 @@ class Visualize:
             processing_output.jaws_X_pix[0][2, 1] = (
                 processing_output.isocenters_pix[0][6, 2]
                 - processing_output.isocenters_pix[0][2, 2]
-                + 0.01
+                + 1
             ) * aspect_ratio + processing_output.jaws_X_pix[0][3, 0]
 
         # Shifting the body model isocenters
-        if (
-            (x_left - (x_right - x_left) / 2)
-            < (processing_output.isocenters_pix[0][2, 2])
-            < (x_left + (x_right - x_left) / 2)
-        ) and MODEL == "body":
+        elif MODEL == "body" and (
+            x_left - (x_right - x_left) / 2
+            < processing_output.isocenters_pix[0][2, 2]
+            < x_left + (x_right - x_left) / 2
+        ):
             # Shifting the isocenter when it is in the neighborhood above, the jaws are fixed after.
             processing_output.isocenters_pix[0][2, 2] = x_left - 10
             processing_output.isocenters_pix[0][3, 2] = x_left - 10
@@ -529,10 +529,9 @@ class Visualize:
                 / 2
             )
 
-        # if processing_output.isocenters_pix[0][2, 2] < x_left here i fix the Jaws aperture.
-        self.fields_on_backbone(aspect_ratio, processing_output, x_right, x_left)
+        self.move_backbone_fields(aspect_ratio, processing_output, x_right, x_left)
 
-        # splitting the distance between the two last iso only for body model
+        # Set distance between the last two iso only for body model to have symmetric fields
         if MODEL == "body" and processing_output.isocenters_pix[0][2, 2] < x_left:
             translation = 0.5 * (
                 (
@@ -553,7 +552,7 @@ class Visualize:
                 )
             )
 
-            # Couple of isocenters on pelvi
+            # Pelvis isocenters
             processing_output.isocenters_pix[0][2, 2] = (
                 processing_output.isocenters_pix[0][0, 2]
                 + processing_output.jaws_X_pix[0][1, 1] / aspect_ratio
@@ -567,7 +566,7 @@ class Visualize:
                 - processing_output.jaws_X_pix[0][3, 0] / aspect_ratio
             )
 
-            # Couple of isocenter on the abdom
+            # Abdomen isocenters
             processing_output.isocenters_pix[0][4, 2] = (
                 processing_output.isocenters_pix[0][3, 2]
                 + processing_output.isocenters_pix[0][6, 2]
@@ -577,18 +576,16 @@ class Visualize:
                 + processing_output.isocenters_pix[0][6, 2]
             ) / 2
 
-            # After this shift I need to check and correct the X_jaws again
-            self.fields_on_backbone(aspect_ratio, processing_output, x_right, x_left)
+            self.move_backbone_fields(aspect_ratio, processing_output, x_right, x_left)
 
-        # Similar check on arms model, and fixing the X_jaws on the backbone
-        if processing_output.isocenters_pix[0][2, 2] > x_right:
-            if MODEL == "arms":
-                processing_output.jaws_X_pix[0][0, 1] = (
-                    x_right - processing_output.isocenters_pix[0][0, 2] - 1
-                ) * aspect_ratio
-                processing_output.jaws_X_pix[0][3, 0] = (
-                    (x_left - processing_output.isocenters_pix[0][2, 2]) + 1
-                ) * aspect_ratio
+        # Move back fields for arms model
+        if MODEL == "arms" and processing_output.isocenters_pix[0][2, 2] > x_right:
+            processing_output.jaws_X_pix[0][0, 1] = (
+                x_right - processing_output.isocenters_pix[0][0, 2] - 1
+            ) * aspect_ratio
+            processing_output.jaws_X_pix[0][3, 0] = (
+                (x_left - processing_output.isocenters_pix[0][2, 2]) + 1
+            ) * aspect_ratio
 
         if single_fig:
             self.single_figure_plot(
@@ -608,7 +605,7 @@ class Visualize:
                 mse=mse,
             )
 
-    def fields_on_backbone(self, aspect_ratio, processing_output, x_right, x_left):
+    def move_backbone_fields(self, aspect_ratio, processing_output, x_right, x_left):
         if processing_output.isocenters_pix[0][2, 2] < x_left:
             processing_output.jaws_X_pix[0][2, 1] = (
                 x_right - processing_output.isocenters_pix[0][2, 2] - 1
@@ -800,16 +797,14 @@ class Visualize:
 
         return x_coord / masks_int.shape[0]  # Normalize the coordinate
 
-    def find_fields_coord(
-        self, patient_index: int, iso: np.ndarray
-    ) -> tuple[int, int, int, int, int]:
+    def find_fields_coord(self, patient_index: int, iso: np.ndarray) -> tuple[int, int]:
         iso_on_arms = self.df_patient_info["IsocenterOnArms"].to_numpy().astype(bool)
         ptv_mask = self.ptv_masks[patient_index]
+
         if iso_on_arms[patient_index]:
             a = (iso[0, 2] + iso[2, 2]) / 2
         else:
             a = (iso[0, 2] + iso[2, 2]) / 2 + 10
-
         b = (iso[2, 2] + iso[6, 2]) / 2
         search_space = {"x_0": np.arange(a, b, 1, dtype=int)}
 
@@ -821,71 +816,69 @@ class Visualize:
         opt = GridSearchOptimizer(search_space)
         opt.search(loss, n_iter=search_space["x_0"].shape[0], verbosity=False)
 
-        start_value = opt.best_value[0]
-        min = 512
-        backbone = int(
-            self.find_x_coord(self.ptv_hu[patient_index]) * ptv_mask.shape[0]
-        )
+        best_x_pixel = opt.best_value[0]
+        x_com = int(self.find_x_coord(self.ptv_hu[patient_index]) * ptv_mask.shape[0])
         y_pixels = np.concatenate(
             (
-                np.arange(backbone - 115, backbone - 50),
-                np.arange(backbone + 50, backbone + 115),
+                np.arange(x_com - 115, x_com - 50),
+                np.arange(x_com + 50, x_com + 115),
             )
         )
-        for j in y_pixels:
-            count = 0
-            flag = True
-            for i in range(40):
-                if ptv_mask[j, opt.best_value[0] + i] == False and flag:
-                    if (
-                        ptv_mask[j, opt.best_value[0] + i]
-                        == ptv_mask[j, opt.best_value[0] + i + 1]
-                    ):
-                        count += 1
-                    else:
-                        count += 1
-                        flag = False
-                    if count == 0:
-                        count = 511
-                if ptv_mask[j, opt.best_value[0] + i] == True and flag:
-                    count = 511
-            if min > count:
-                min = count
-                min_pos_x_RU = opt.best_value[0] + count
-                min_pos_y_RU = j
-        R_pos_x = min_pos_x_RU  # pyright: ignore[reportUnboundVariable]
-        R_pos_y = min_pos_y_RU  # pyright: ignore[reportUnboundVariable]
+
+        min_pos_x_right = best_x_pixel
         min = 512
         for j in y_pixels:
             count = 0
-            flag = True
             for i in range(40):
-                if ptv_mask[j, opt.best_value[0] - i] == False and flag:
+                if not ptv_mask[j, best_x_pixel + i]:  # pixel is background
+                    count += 1
                     if (
-                        ptv_mask[j, opt.best_value[0] - i]
-                        == ptv_mask[j, opt.best_value[0] - i - 1]
+                        ptv_mask[j, best_x_pixel + i]
+                        != ptv_mask[j, best_x_pixel + i + 1]
                     ):
-                        count += 1
-                    else:
-                        count += 1
-                        flag = False
-                    if count == 0:
-                        count = min - 1
-                        count = 1000
+                        break
+                if ptv_mask[j, best_x_pixel + i]:  # pixel in mask
+                    count = np.inf  # count == np.inf if first pixel is in mask
+                    break
+
+            # Assumption: at least one pixel along j is background
             if min > count:
                 min = count
-                min_pos_x_LU = opt.best_value[0] - count
-                min_pos_y_LU = j
-        L_pos_x = min_pos_x_LU  # pyright: ignore[reportUnboundVariable]
-        L_pos_y = min_pos_y_LU  # pyright: ignore[reportUnboundVariable]
+                min_pos_x_right = best_x_pixel + count
+
+        assert (
+            min_pos_x_right == best_x_pixel
+        ), "Optimization has not found correct position"
+
+        min_pos_x_left = best_x_pixel
+        min = 512
+        for j in y_pixels:
+            count = 0
+            for i in range(40):
+                if not ptv_mask[j, best_x_pixel - i]:  # pixel is background
+                    count += 1
+                    if (
+                        ptv_mask[j, best_x_pixel - i]
+                        != ptv_mask[j, best_x_pixel - i - 1]
+                    ):
+                        break
+                if ptv_mask[j, best_x_pixel - i]:  # pixel in mask
+                    count = np.inf  # count == np.inf if first pixel is in mask
+                    break
+
+            # Assumption: at least one pixel along j is background
+            if min > count:
+                min = count
+                min_pos_x_left = best_x_pixel - count
+
+        assert (
+            min_pos_x_left == best_x_pixel
+        ), "Optimization has not found correct position"
 
         return (
-            start_value,
-            R_pos_x,
-            R_pos_y,
-            L_pos_x,
-            L_pos_y,
-        )  # Normalize the coordinate
+            min_pos_x_right,
+            min_pos_x_left,
+        )
 
 
 if __name__ == "__main__":
