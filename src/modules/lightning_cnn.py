@@ -32,6 +32,7 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
                 and angle classification
         """
         super().__init__()
+        self.version = 0
         self.example_input_array = torch.Tensor(
             1, 3, 512, 512
         )  # display the intermediate input and output sizes of layers when trainer.fit() is called
@@ -185,7 +186,7 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
             self.logger.log_dir,  # pyright: ignore[reportGeneralTypeIssues, reportOptionalMemberAccess]
             "train_img",  # pyright: ignore[reportGeneralTypeIssues]
         )
-        viz = Visualize()
+        viz = Visualize(self.logger.log_dir)
         vis_image_train = x_train.numpy()[0, 0, :, :]
         vis_image_test = x.numpy()[0, 0, :, :]
         # Two plots, first one for the train and the second for the test images

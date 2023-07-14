@@ -8,13 +8,15 @@ import matplotlib.patches as mpatches
 from src.data.processing import Processing
 from scipy import ndimage  # pyright: ignore[reportGeneralTypeIssues]
 from gradient_free_optimizers import GridSearchOptimizer
+import yaml
 from src.config.constants import MODEL
+import lightning.pytorch as pl
 
 
 class Visualize:
     """Visualization class to visualize and optimize model's output"""
 
-    def __init__(self) -> None:
+    def __init__(self, log_dic) -> None:
         with np.load(r"data\raw\ptv_masks2D.npz") as npz_masks2d:
             self.ptv_masks = list(npz_masks2d.values())
         with np.load(r"data\raw\ptv_imgs2D.npz") as npz_masks2d:
@@ -30,6 +32,7 @@ class Visualize:
         self.slice_tickness_col_idx = self.df_patient_info.columns.get_loc(
             key="SliceThickness"
         )
+        self.model_dir = log_dic
 
     def build_output(
         self, y_hat: torch.Tensor, patient_idx: int, aspect_ratio: float
@@ -174,8 +177,9 @@ class Visualize:
 
                     # Arms apertures with opposite sign
                     output[80 + 2 * i] = -200 / (
-                        slice_thickness * original_size
-                    )  # result of -200 mm/(original shape*slice thickness), fixed aperture normalized
+                        slice_thickness
+                        * original_size  # result of -200 mm/(original shape*slice thickness), fixed aperture normalized
+                    )
                     output[81 + 2 * i] = 200 / (slice_thickness * original_size)
 
                 output[76 + i] = y_hat[26 + i].item()  # apertures for the head
@@ -242,7 +246,25 @@ class Visualize:
                     output[81 + 2 * i] = 0
 
                 output[76 + i] = y_hat[21 + i].item()  # apertures for the head
+        path = os.path.join(
+            self.model_dir,  # pyright: ignore[reportGeneralTypeIssues, reportOptionalMemberAccess]
+            "hparams.yaml",
+        )
+        with open(path, "r+") as file:
+            data = yaml.safe_load(file)
+            distance_between_isocenters = (output[2] - output[26]) * (
+                slice_thickness * original_size
+            )
+            dist_pat = "distance between first and last isocenter_" + str(patient_idx)
+            data[dist_pat] = float(distance_between_isocenters)
+            yaml.dump(data, file)
+            data = None
 
+        if output[2] - output[26] > (840 / (slice_thickness * original_size)):
+            shift_measure = (output[2] - output[26]) - (
+                840 / (slice_thickness * original_size)
+            )
+            output[[2, 5]] = output[2] - shift_measure
         return torch.from_numpy(output)
 
     def extract_original_data(
