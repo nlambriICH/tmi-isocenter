@@ -68,7 +68,7 @@ class DatasetArms(Dataset):
             - Specific indices are used to select the unique values from the input arrays.
             Details about the selected indices can be found in the function implementation.
         """
-        y_reg = np.zeros(shape=(self.num_patients, 1, 32), dtype=float)
+        y_reg = np.zeros(shape=(self.num_patients, 1, 30), dtype=float)
         for i, (iso, jaw_X_pix, jaw_Y_pix) in enumerate(
             zip(isocenters_pix_flat, jaws_X_pix_flat, jaws_Y_pix_flat)
         ):
@@ -109,8 +109,6 @@ class DatasetArms(Dataset):
                 17,
                 18,
                 19,
-                20,
-                22,
             ]  # Here we exploit the body's symmetry.
             # We keep [0,2] for the legs,  4 = one values fields (pelvi+chest), 8= third iso, [16,17,18,19] for the head, [20,22]= for the arms.
             y_jaw_Y = jaw_Y_pix[unique_Y_idx]

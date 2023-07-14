@@ -13,7 +13,7 @@ class ArmCNN(LitCNN):  # pylint: disable=too-many-ancestors
         weight=3,
         focus_on=[0, 1],
         filters=4,
-        output=32,
+        output=30,
     ):
         """Initialize the LitCNN module
 
