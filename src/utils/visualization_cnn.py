@@ -24,11 +24,21 @@ class Visualize:
         self.jaws_Y_pix = np.load(r"data\raw\jaws_Y_pix.npy")
         self.coll_angles = np.load(r"data\raw\angles.npy")
         self.df_patient_info = pd.read_csv(r"data\patient_info.csv")
+        self.original_sizes_col_idx = self.df_patient_info.columns.get_loc(
+            key="OrigMaskShape_z"
+        )
+        self.slice_tickness_col_idx = self.df_patient_info.columns.get_loc(
+            key="SliceThickness"
+        )
 
     def build_output(
         self, y_hat: torch.Tensor, patient_idx: int, aspect_ratio: float
     ) -> torch.Tensor:
         output = np.zeros(shape=(84))
+        norm = aspect_ratio * self.ptv_hu[patient_idx].shape[1] / 512
+        slice_thickness = self.df_patient_info.iloc[
+            patient_idx, self.slice_tickness_col_idx
+        ]
 
         # Isocenter indexes
         index_X = [0, 3, 6, 9, 12, 15, 18, 21, 24, 27]
@@ -91,7 +101,12 @@ class Visualize:
 
                 output[76 + i] = y_hat[33 + i].item()  # apertures for the head
 
-        elif y_hat.shape[0] == 32:  # arms model
+        elif y_hat.shape[0] == 30:  # arms model
+            original_size = int(
+                self.df_patient_info.iloc[
+                    patient_idx, self.original_sizes_col_idx
+                ]  # pyright: ignore[reportGeneralTypeIssues]
+            )
             output[30] = y_hat[0].item()  # z coord right arm
             output[33] = y_hat[
                 1
@@ -132,7 +147,7 @@ class Visualize:
 
             output[59] = y_hat[22].item()
             # Overlap fields
-            norm = aspect_ratio * self.ptv_hu[patient_idx].shape[1] / 512
+
             output[41] = (y_hat[3].item() - y_hat[4].item() + 0.01) * norm + output[
                 50
             ]  # abdomen
@@ -158,12 +173,10 @@ class Visualize:
                     output[73 + 2 * i] = -y_hat[24].item()
 
                     # Arms apertures with opposite sign
-                    output[80 + 2 * i] = y_hat[
-                        30 + i
-                    ].item()  # this will be changed with 40/512, fixed aperture normalized
-                    output[81 + 2 * i] = -y_hat[
-                        30 + i
-                    ].item()  # this will be changed with 40/512, fixed aperture normalized
+                    output[80 + 2 * i] = -200 / (
+                        slice_thickness * original_size
+                    )  # result of -200 mm/(original shape*slice thickness), fixed aperture normalized
+                    output[81 + 2 * i] = 200 / (slice_thickness * original_size)
 
                 output[76 + i] = y_hat[26 + i].item()  # apertures for the head
 
@@ -434,22 +447,18 @@ class Visualize:
         - The function calls the `extract_data` function to reorganize the CNN output.
         """
         pix_spacing_col_idx = self.df_patient_info.columns.get_loc(key="PixelSpacing")
-        slice_tickness_col_idx = self.df_patient_info.columns.get_loc(
-            key="SliceThickness"
-        )
-        original_sizes_col_idx = self.df_patient_info.columns.get_loc(
-            key="OrigMaskShape_z"
-        )
 
         pix_spacing = self.df_patient_info.iloc[patient_idx, pix_spacing_col_idx]
-        slice_thickness = self.df_patient_info.iloc[patient_idx, slice_tickness_col_idx]
+        slice_thickness = self.df_patient_info.iloc[
+            patient_idx, self.slice_tickness_col_idx
+        ]
         aspect_ratio = (
             slice_thickness / pix_spacing
         )  # pyright: ignore[reportGeneralTypeIssues]
 
         original_size = int(
             self.df_patient_info.iloc[
-                patient_idx, original_sizes_col_idx
+                patient_idx, self.original_sizes_col_idx
             ]  # pyright: ignore[reportGeneralTypeIssues]
         )
 
