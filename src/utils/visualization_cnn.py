@@ -46,7 +46,7 @@ class Visualize:
         index_X = [0, 3, 6, 9, 12, 15, 18, 21, 24, 27]
         index_Y = [1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34]
         output[index_X] = (
-            ndimage.center_of_mass(self.image_interim)[0] / self.image_interim.shape[0]
+            ndimage.center_of_mass(self.image_interim)[1] / self.image_interim.shape[0]
         )  # x coord repeated 8 times + 2 times for iso thorax
         output[
             index_Y
@@ -627,11 +627,25 @@ class Visualize:
         for jaw_x, jaw_y in zip(
             processing_output.jaws_X_pix[0], processing_output.jaws_Y_pix[0]
         ):
-            for i in range(2):
-                if np.abs(jaw_x[i]) > 200 / slice_thickness:
-                    jaw_x[i] = 200 / slice_thickness * (-1) ** (i + 1)
-                if np.abs(jaw_y[i]) > 200 / pix_spacing:
+            for i in range(
+                2
+            ):  # Divide by pix_spacing/slice_thickness because I need to change unite measure: mm -> pixel
+                if np.abs(jaw_x[i]) > 200 / pix_spacing:
+                    jaw_x[i] = 200 / pix_spacing * (-1) ** (i + 1)
+                    print(
+                        "The aperture on x was",
+                        jaw_x[i],
+                        "now is setted on:",
+                        200 / pix_spacing * (-1) ** (i + 1),
+                    )
+                if np.abs(jaw_y[i]) > 200 / slice_thickness:
                     jaw_y[i] = 200 / slice_thickness * (-1) ** (i + 1)
+                    print(
+                        "The aperture on x was",
+                        jaw_y[i],
+                        "now is setted on:",
+                        200 / slice_thickness * (-1) ** (i + 1),
+                    )
 
         if single_fig:
             self.single_figure_plot(
@@ -843,7 +857,7 @@ class Visualize:
         opt.search(loss, n_iter=search_space["x_0"].shape[0], verbosity=False)
 
         best_x_pixel = opt.best_value[0]
-        x_com = int(ndimage.center_of_mass(self.image_interim)[0])
+        x_com = int(ndimage.center_of_mass(self.image_interim)[1])
         y_pixels = np.concatenate(
             (
                 np.arange(x_com - 115, x_com - 50),
