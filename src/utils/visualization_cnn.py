@@ -6,15 +6,14 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from src.data.processing import Processing
-from scipy import ndimage  # pyright: ignore[reportGeneralTypeIssues]
+from scipy import ndimage
 from gradient_free_optimizers import GridSearchOptimizer
 import yaml
 from src.config.constants import MODEL
-import lightning.pytorch as pl
 
 
 class Visualize:
-    """Visualization class to visualize and optimize model's output"""
+    """Visualization class to visualize model's output"""
 
     def __init__(self, log_dic) -> None:
         with np.load(r"data\raw\ptv_masks2D.npz") as npz_masks2d:
@@ -39,15 +38,15 @@ class Visualize:
     ) -> torch.Tensor:
         output = np.zeros(shape=(84))
         norm = aspect_ratio * self.ptv_hu[patient_idx].shape[1] / 512
-        slice_thickness = self.df_patient_info.iloc[
-            patient_idx, self.slice_tickness_col_idx
-        ]
+        slice_thickness = float(
+            self.df_patient_info.iloc[patient_idx, self.slice_tickness_col_idx]
+        )
 
         # Isocenter indexes
         index_X = [0, 3, 6, 9, 12, 15, 18, 21, 24, 27]
         index_Y = [1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34]
-        output[index_X] = self.find_x_coord(
-            self.ptv_hu[patient_idx]
+        output[index_X] = (
+            ndimage.center_of_mass(self.image_interim)[0] / self.image_interim.shape[0]
         )  # x coord repeated 8 times + 2 times for iso thorax
         output[
             index_Y
@@ -251,14 +250,13 @@ class Visualize:
             "hparams.yaml",
         )
         with open(path, "r+") as file:
-            data = yaml.safe_load(file)
+            data = yaml.safe_load(file)  # that is necessary
             distance_between_isocenters = (output[2] - output[26]) * (
                 slice_thickness * original_size
             )
-            dist_pat = "distance between first and last isocenter_" + str(patient_idx)
-            data[dist_pat] = float(distance_between_isocenters)
-            yaml.dump(data, file)
-            data = None
+            dist_pat = "distance first last iso_" + str(patient_idx)
+            row_to_append = {dist_pat: float(distance_between_isocenters)}
+            yaml.dump(row_to_append, file, default_flow_style=False)
 
         if output[2] - output[26] > (840 / (slice_thickness * original_size)):
             shift_measure = (output[2] - output[26]) - (
@@ -468,6 +466,7 @@ class Visualize:
         ------
         - The function calls the `extract_data` function to reorganize the CNN output.
         """
+        self.image_interim = img_interim
         pix_spacing_col_idx = self.df_patient_info.columns.get_loc(key="PixelSpacing")
 
         pix_spacing = self.df_patient_info.iloc[patient_idx, pix_spacing_col_idx]
@@ -623,6 +622,16 @@ class Visualize:
             processing_output.jaws_X_pix[0][3, 0] = (
                 (x_left - processing_output.isocenters_pix[0][2, 2]) + 1
             ) * aspect_ratio
+
+        ### check fields' aperture
+        for jaw_x, jaw_y in zip(
+            processing_output.jaws_X_pix[0], processing_output.jaws_Y_pix[0]
+        ):
+            for i in range(2):
+                if np.abs(jaw_x[i]) > 200 / slice_thickness:
+                    jaw_x[i] = 200 / slice_thickness * (-1) ** (i + 1)
+                if np.abs(jaw_y[i]) > 200 / pix_spacing:
+                    jaw_y[i] = 200 / slice_thickness * (-1) ** (i + 1)
 
         if single_fig:
             self.single_figure_plot(
@@ -814,26 +823,6 @@ class Visualize:
         plt.savefig(os.path.join(real_img_path, f"output_test_{patient_idx}"), dpi=2000)
         plt.close()
 
-    def find_x_coord(self, masks_int: np.ndarray) -> float:
-        """
-            Find the x-coordinate of the center of mass of the given binary masks.
-
-        Args:
-            masks_int (np.ndarray): A numpy array representing binary masks.
-
-        Returns:
-            float: The normalized x-coordinate of the center of mass.
-
-        """
-
-        x_coord = round(
-            ndimage.center_of_mass(masks_int)[
-                0
-            ]  # pyright: ignore[reportGeneralTypeIssues]
-        )
-
-        return x_coord / masks_int.shape[0]  # Normalize the coordinate
-
     def find_fields_coord(self, patient_index: int, iso: np.ndarray) -> tuple[int, int]:
         iso_on_arms = self.df_patient_info["IsocenterOnArms"].to_numpy().astype(bool)
         ptv_mask = self.ptv_masks[patient_index]
@@ -854,7 +843,7 @@ class Visualize:
         opt.search(loss, n_iter=search_space["x_0"].shape[0], verbosity=False)
 
         best_x_pixel = opt.best_value[0]
-        x_com = int(self.find_x_coord(self.ptv_hu[patient_index]) * ptv_mask.shape[0])
+        x_com = int(ndimage.center_of_mass(self.image_interim)[0])
         y_pixels = np.concatenate(
             (
                 np.arange(x_com - 115, x_com - 50),
@@ -916,104 +905,3 @@ class Visualize:
             min_pos_x_right,
             min_pos_x_left,
         )
-
-
-if __name__ == "__main__":
-    # Output tensor of old CNN model with 30 epochs training
-    patient_idx = 77
-    output = torch.tensor(  # old output shape (84 numbers)
-        [
-            5.0588e-01,
-            4.9987e-01,
-            2.7237e-01,
-            4.9922e-01,
-            4.9281e-01,
-            2.7689e-01,
-            5.0469e-01,
-            4.9276e-01,
-            4.0748e-01,
-            4.9819e-01,
-            4.9476e-01,
-            4.0605e-01,
-            4.9738e-01,
-            4.9431e-01,
-            5.4956e-01,
-            4.9909e-01,
-            4.9260e-01,
-            5.4846e-01,
-            5.0365e-01,
-            4.9595e-01,
-            7.0933e-01,
-            5.0560e-01,
-            4.9706e-01,
-            7.1214e-01,
-            5.0432e-01,
-            4.9824e-01,
-            8.7026e-01,
-            5.0043e-01,
-            4.9352e-01,
-            8.6910e-01,
-            4.0263e-03,
-            8.6793e-04,
-            2.0613e-03,
-            -2.2139e-03,
-            -1.4555e-03,
-            -1.0349e-04,
-            -1.3892e-02,
-            1.8421e-01,
-            -2.8368e-01,
-            1.9689e-02,
-            -1.4855e-02,
-            1.8129e-01,
-            -1.8445e-01,
-            1.6081e-02,
-            -3.4334e-02,
-            1.7798e-01,
-            -1.5245e-01,
-            4.7227e-02,
-            -1.5162e-02,
-            1.7590e-01,
-            -2.0080e-01,
-            1.7991e-02,
-            -1.3397e-02,
-            1.7829e-01,
-            -1.8128e-01,
-            1.7314e-02,
-            -5.4344e-04,
-            5.9771e-04,
-            4.1955e-03,
-            1.8666e-04,
-            -1.5276e-01,
-            1.5309e-01,
-            -1.4945e-01,
-            1.5163e-01,
-            -1.5083e-01,
-            1.5180e-01,
-            -1.5181e-01,
-            1.5361e-01,
-            -1.5326e-01,
-            1.5264e-01,
-            -1.5179e-01,
-            1.5012e-01,
-            -1.5294e-01,
-            1.5167e-01,
-            -1.4822e-01,
-            1.5724e-01,
-            -8.4362e-02,
-            9.3764e-02,
-            -8.8720e-02,
-            8.2712e-02,
-            1.9370e-04,
-            -2.8278e-03,
-            -2.8790e-03,
-            -1.2458e-03,
-        ]
-    )
-
-    test_build_output = torch.arange(1, 43)  # range [1, 42] step=1, new output shape
-    test = Visualize()
-    reconstructed_output = test.build_output(test_build_output, patient_idx, 4.26)
-    assert reconstructed_output.shape[0] == 84
-
-    path = "test"
-    # test.plot_img(test.ptv_hu[77],patient_idx, output, path) #NEED TO PASS AN IMAGE INTERIM
