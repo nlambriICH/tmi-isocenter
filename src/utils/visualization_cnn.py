@@ -41,7 +41,11 @@ class Visualize:
         slice_thickness = float(
             self.df_patient_info.iloc[patient_idx, self.slice_tickness_col_idx]
         )
-
+        original_size = int(
+            self.df_patient_info.iloc[
+                patient_idx, self.original_sizes_col_idx
+            ]  # pyright: ignore[reportGeneralTypeIssues]
+        )
         # Isocenter indexes
         index_X = [0, 3, 6, 9, 12, 15, 18, 21, 24, 27]
         index_Y = [1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34]
@@ -104,11 +108,6 @@ class Visualize:
                 output[76 + i] = y_hat[33 + i].item()  # apertures for the head
 
         elif y_hat.shape[0] == 30:  # arms model
-            original_size = int(
-                self.df_patient_info.iloc[
-                    patient_idx, self.original_sizes_col_idx
-                ]  # pyright: ignore[reportGeneralTypeIssues]
-            )
             output[30] = y_hat[0].item()  # z coord right arm
             output[33] = y_hat[
                 1
@@ -631,21 +630,23 @@ class Visualize:
                 2
             ):  # Divide by pix_spacing/slice_thickness because I need to change unite measure: mm -> pixel
                 if np.abs(jaw_x[i]) > 200 / pix_spacing:
-                    jaw_x[i] = 200 / pix_spacing * (-1) ** (i + 1)
                     print(
                         "The aperture on x was",
                         jaw_x[i],
                         "now is setted on:",
                         200 / pix_spacing * (-1) ** (i + 1),
                     )
+
+                    jaw_x[i] = 200 / pix_spacing * (-1) ** (i + 1)
+
                 if np.abs(jaw_y[i]) > 200 / slice_thickness:
-                    jaw_y[i] = 200 / slice_thickness * (-1) ** (i + 1)
                     print(
-                        "The aperture on x was",
+                        "The aperture on y was",
                         jaw_y[i],
                         "now is setted on:",
                         200 / slice_thickness * (-1) ** (i + 1),
                     )
+                    jaw_y[i] = 200 / slice_thickness * (-1) ** (i + 1)
 
         if single_fig:
             self.single_figure_plot(
