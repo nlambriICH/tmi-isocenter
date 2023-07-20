@@ -24,7 +24,7 @@ class Dataset:
         self.df_patient_info_original = pd.read_csv(r"data\patient_info.csv")
         self.df_patient_info = self.df_patient_info_original
 
-    def normalize_ptv_hu(self, background=-1) -> None:
+    def normalize_ptv_hu(self, background=0) -> None:
         """Normalize the channel corresponding to the PTV HU density.
 
         Parameters:
@@ -47,12 +47,12 @@ class Dataset:
             mask_hu = mask2[0]
             mask_ptv = mask2[1]
             non_zero_values = mask_hu[np.nonzero(mask_ptv)]
-            min_value = np.min(non_zero_values) if background == -1 else np.min(mask_hu)
-            max_value = np.max(non_zero_values) if background == -1 else np.max(mask_hu)
+            min_value = np.min(non_zero_values) if background == 0 else np.min(mask_hu)
+            max_value = np.max(non_zero_values) if background == 0 else np.max(mask_hu)
             difference = max_value - min_value
             normalized = (
                 np.where(mask_ptv != 0, (mask_hu - min_value) / difference, background)
-                if background == -1
+                if background == 0
                 else (mask_hu - min_value) / difference
             )
 
