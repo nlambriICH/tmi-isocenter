@@ -362,12 +362,20 @@ class optimization:
         ):
 
             def _loss(pos_new):
-                # Loss:
-                # 1) maximize background pixels while minimizing pixels in mask
-                # (do not use == 1 to count pixels in mask because the mask is rescaled)
-                # 2) maximize the count of background pixels along the 'y' pixels for a
-                # given candidate 'x' pixel location
+                """
+                Compute the optimization loss based on the given position.
 
+                Parameters:
+                - pos_new (dict): Dictionary containing the positions of iliac crests and ribs.
+                                    It has the keys "x_iliac" and "x_ribs" representing the pixel
+                                    locations of the iliac crests and ribs.
+
+                Returns:
+                - score (float): The computed optimization score, which is a combination of two terms:
+                                1. Maximizing background pixels while minimizing pixels in the mask.
+                                2. Maximizing the count of background pixels along the 'y' pixels for a
+                                    given candidate 'x' pixel location.
+                """
                 x_iliac = pos_new["x_iliac"]
                 x_ribs = pos_new["x_ribs"]
 
@@ -415,16 +423,16 @@ class optimization:
         of the ribs and iliac crests and optimize the abdominal field geometry.
         """
 
-        # try:
-        #    assert self.img_interim[0].shape == (
-        #        512,
-        #        self.original_size,
-        #        3,
-        #    )
-        # except AssertionError:
-        #    logging.exception(
-        #        "Expected original shape image. The local optimization might give incorrect results."
-        #    )
+        try:
+            assert self.img_interim[0].shape == (
+                512,
+                self.original_size,
+                3,
+            )
+        except AssertionError:
+            logging.exception(
+                "Expected original shape image. The local optimization might give incorrect results."
+            )
 
         # Maximum distance between head-pelvis isocenters: 840 mm
 

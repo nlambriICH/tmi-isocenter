@@ -110,6 +110,10 @@ class Dataset:
         return (train_idx, val_idx, test_idx)
 
     def augment_train(self):
+        """
+        Apply affine data augmentation to training data.
+
+        """
         aug = Augmentation(
             self.masks2d,
             self.train_idx,

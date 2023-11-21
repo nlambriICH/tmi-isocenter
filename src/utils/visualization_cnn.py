@@ -7,7 +7,6 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from src.data.processing import Processing
 from scipy import ndimage
-from gradient_free_optimizers import GridSearchOptimizer
 import yaml
 from src.config.constants import MODEL
 from src.utils.optimization_cnn import optimization
@@ -37,10 +36,26 @@ class Visualize:
     def build_output(
         self, y_hat: torch.Tensor, patient_idx: int, aspect_ratio: float
     ) -> torch.Tensor:
+        """
+        Build the output tensor based on the predicted values and patient information.
+
+        Parameters:
+        - y_hat (torch.Tensor): Predicted tensor from the model.
+        - patient_idx (int): Index of the patient in the test set, to be plotted.
+        - aspect_ratio (float): Aspect ratio used durig the CT.
+
+        Returns:
+        - torch.Tensor: Output tensor representing the treatment plan.
+
+        Note:
+        - The function constructs a 1D output tensor with 84 elements.
+        """
         output = np.zeros(shape=(84))
         norm = aspect_ratio * self.ptv_hu[patient_idx].shape[1] / 512
         slice_thickness = float(
-            self.df_patient_info.iloc[patient_idx, self.slice_tickness_col_idx]
+            self.df_patient_info.iloc[
+                patient_idx, self.slice_tickness_col_idx
+            ]  # pyright: ignore[reportGeneralTypeIssues]
         )
         original_size = int(
             self.df_patient_info.iloc[
@@ -52,7 +67,8 @@ class Visualize:
         index_Y = [1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34]
         self.x_com = ndimage.center_of_mass(self.image_interim)[1]
         output[index_X] = (
-            self.x_com / self.image_interim.shape[0]
+            self.x_com
+            / self.image_interim.shape[0]  # pyright: ignore[reportGeneralTypeIssues]
         )  # x coord repeated 8 times + 2 times for iso thorax
         output[
             index_Y

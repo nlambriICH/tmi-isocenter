@@ -426,6 +426,24 @@ class Processing:
         width_resize: int,
         aug: iaa.Sequential,
     ):
+        """
+        Apply data augmentation to a 2D mask and associated keypoints.
+
+        Parameters:
+        - masks_aug (list[np.ndarray]): List to store augmented 2D masks.
+        - isos_kps_img_aug3D (np.ndarray): Array to store augmented 3D keypoints.
+        - jaws_Y_pix_aug (np.ndarray): Array to store augmented Y apertures.
+        - i (int): Index indicating the current augmentation iteration.
+        - mask2d (np.ndarray): 2D mask to be augmented.
+        - iso_pix (np.ndarray): 2D array containing the original isocenter keypoints.
+        - jaw_Y_pix (np.ndarray): 1D array containing original Y apertures.
+        - width_resize (int): Width to which Y apertures should be resized.
+        - aug (imgaug.augmenters.Sequential): Augmentation sequence applied to the mask.
+
+        Note:
+        - Augmentation is applied to the 2D mask and its associated keypoints (isos_kps_img).
+        """
+
         iso_kps_img = KeypointsOnImage(
             [Keypoint(x=iso[2], y=iso[0]) for iso in iso_pix],
             shape=mask2d.shape,

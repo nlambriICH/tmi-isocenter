@@ -147,7 +147,8 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
     def test_step(  # pylint: disable=arguments-differ
         self, batch: list[torch.Tensor], batch_idx: int
     ) -> None:
-        """Test loop
+        """
+        Test loop
 
         Args:
             batch (list[torch.Tensor]): input batch

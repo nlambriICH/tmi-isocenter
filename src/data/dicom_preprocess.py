@@ -23,6 +23,10 @@ from src.utils.field_geometry_transf import transform_field_geometry
 
 
 def filter_ptv_name(name: str) -> bool:
+    """
+    The function checks if the lowercase version of the name contains "ptv" or "tot"
+    and does not contain any excluded substrings defined in the PTV_EXCLUDE_SUBSTRINGS list.
+    """
     name_lower = name.lower()
     return ("ptv" in name_lower or "tot" in name_lower) and all(
         substring not in name_lower for substring in PTV_EXCLUDE_SUBSTRINGS

@@ -1,6 +1,5 @@
 """Script for model training"""
 import torch
-import numpy as np
 from torch.utils.data import TensorDataset, DataLoader
 import lightning.pytorch as pl
 from lightning.pytorch.callbacks import ModelSummary, LearningRateMonitor
@@ -32,7 +31,6 @@ if __name__ == "__main__":
         name = "whole_model"
 
     train_index, val_idx, test_index = dataset.train_val_test_split()
-    # test_index=np.array([59,60,61,62,63,64,65,66],) # Custom list of patients to use as test set for the model.
     train_index = dataset.augment_train()
     masks_aug, y_reg, y_cls = dataset.get_data_Xy()
 
@@ -87,12 +85,8 @@ if __name__ == "__main__":
             y_reg_test,
             y_cls_test,
             test_idx,
-            masks_train[
-                0:test_len
-            ],  # it switches if the dataset changes: [0:11] or [0:3]
-            train_index[
-                0:test_len
-            ],  # it switches if the dataset changes: [0:11] or [0:3]
+            masks_train[0:test_len],  # mask_train = [0:11] or [0:3]
+            train_index[0:test_len],  # mask_train = [0:11] or [0:3]
         ),
         shuffle=True,
         num_workers=3,
@@ -114,11 +108,6 @@ if __name__ == "__main__":
         max_epochs=50,
         log_every_n_steps=1,
     )
-
-    # Uncomment this part ito evaluate a patient saved in a precedent model!
-    # my_model=lightning_cnn
-    # tersn =  my_model.load_from_checkpoint(r"D:\tmi-isocenter-1\lightning_logs\body_model\version_118\checkpoints\epoch=22-step=414.ckpt") ""example_of_path""
-    # trainer.test(model=tersn, dataloaders=test_loader)
 
     trainer.fit(
         model=lightning_cnn, train_dataloaders=train_loader, val_dataloaders=val_loader
