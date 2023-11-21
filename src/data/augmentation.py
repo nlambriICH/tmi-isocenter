@@ -10,7 +10,26 @@ from src.config.constants import MODEL
 
 
 class Augmentation:
-    """Dataset class to augment data"""
+    """
+    A utility class for augmenting the custom images, created in processing.
+
+    The `Augmentation` provides methods to apply various data
+    augmentation techniques, including flipping, translation, elastic transformation,
+    and cutout, to a subset (80%) of images in the dataset.
+
+    Attributes:
+        - masks (np.ndarray): The array of images.
+        - isocenters_pix (np.ndarray): Isocenter positions in pixel coordinates.
+        - train_indexes (np.ndarray): Indexes of training images in the dataset.
+        - jaws_X_pix (np.ndarray): Jaw X positions in pixel coordinates.
+        - jaws_Y_pix (np.ndarray): Jaw Y positions in pixel coordinates.
+        - angles (np.ndarray): Angles associated with the images.
+        - df_patient_info (pd.DataFrame): DataFrame containing CT patient information.
+
+    Methods:
+        - augment_affine(): Apply flip, translate, elastic, and cutout augmentations
+          to a subset of images in the dataset.
+    """
 
     def __init__(
         self,
@@ -50,7 +69,8 @@ class Augmentation:
         pd.DataFrame,
         np.ndarray,
     ]:
-        """Apply flip, translate, elastic augmentations to a subset of images.
+        """
+        Apply flip, translate, elastic augmentations to a subset of images.
 
         Returns:
             A tuple containing the augmented data:

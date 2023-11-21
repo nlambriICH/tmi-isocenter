@@ -10,6 +10,7 @@ from scipy import ndimage
 from gradient_free_optimizers import GridSearchOptimizer
 import yaml
 from src.config.constants import MODEL
+from src.utils.optimization_cnn import optimization
 
 
 class Visualize:
@@ -49,8 +50,9 @@ class Visualize:
         # Isocenter indexes
         index_X = [0, 3, 6, 9, 12, 15, 18, 21, 24, 27]
         index_Y = [1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34]
+        self.x_com = ndimage.center_of_mass(self.image_interim)[1]
         output[index_X] = (
-            ndimage.center_of_mass(self.image_interim)[1] / self.image_interim.shape[0]
+            self.x_com / self.image_interim.shape[0]
         )  # x coord repeated 8 times + 2 times for iso thorax
         output[
             index_Y
@@ -433,7 +435,7 @@ class Visualize:
 
     def plot_img(
         self,
-        img_interim: np.ndarray,
+        img_interim_3D: np.ndarray,
         patient_idx: int,
         output: torch.Tensor,
         path: str,
@@ -465,7 +467,9 @@ class Visualize:
         ------
         - The function calls the `extract_data` function to reorganize the CNN output.
         """
-        self.image_interim = img_interim
+        self.image_interim_3D = img_interim_3D
+        self.image_interim = img_interim_3D[0, :, :]
+        self.image_ptv = img_interim_3D[1, :, :]
         pix_spacing_col_idx = self.df_patient_info.columns.get_loc(key="PixelSpacing")
 
         pix_spacing = self.df_patient_info.iloc[patient_idx, pix_spacing_col_idx]
@@ -503,150 +507,36 @@ class Visualize:
             angles[11] = 5
 
         processing_output = Processing(
-            [img_interim],  # interim image
+            [self.image_ptv],  # interim image
             isocenters_hat,
             jaws_X_pix_hat,
             jaws_Y_pix_hat,
             angles,
         )
 
+        ################################# TO FIX #######################à
+        processing_optimiz = Processing(
+            [self.image_ptv],  # interim image
+            isocenters_hat,
+            jaws_X_pix_hat,
+            jaws_Y_pix_hat,
+            angles,
+        )
+        #####################################à
+
         # Retrieve information of the original shape
         processing_output.original_sizes = [original_size]
         processing_output.inverse_trasform()
 
-        # Local optimization
-        x_right, x_left = self.find_fields_coord(
-            patient_idx,
-            processing_output.isocenters_pix[0],  # patient's isocenters
+        # I create the istance from optimization class
+        local_optimization = optimization(
+            patient_idx=patient_idx,
+            output_proc=processing_output,
+            img=self.image_interim_3D,
+            aspect_ratio=aspect_ratio,
         )
-
-        # Shift the arms model isocenters
-        if MODEL == "arms" and (
-            x_right
-            < processing_output.isocenters_pix[0][2, 2]
-            < x_right + (x_right - x_left) / 2
-            or x_left > processing_output.isocenters_pix[0][2, 2]
-        ):
-            # Setting the isocenters for arms model at 3/4 space
-            processing_output.isocenters_pix[0][2, 2] = (
-                x_left + (x_right - x_left) * 3 / 4
-            )
-            processing_output.isocenters_pix[0][3, 2] = (
-                x_left + (x_right - x_left) * 3 / 4
-            )
-            # Fixing the fields with minimum overlap, after the isocenter shift
-            processing_output.jaws_X_pix[0][2, 1] = (
-                processing_output.isocenters_pix[0][6, 2]
-                - processing_output.isocenters_pix[0][2, 2]
-                + 1
-            ) * aspect_ratio + processing_output.jaws_X_pix[0][3, 0]
-
-        # Shifting the body model isocenters
-        elif MODEL == "body" and (
-            x_left - (x_right - x_left) / 2
-            < processing_output.isocenters_pix[0][2, 2]
-            < x_left + (x_right - x_left) / 2
-        ):
-            # Shifting the isocenter when it is in the neighborhood above, the jaws are fixed after.
-            processing_output.isocenters_pix[0][2, 2] = x_left - 10
-            processing_output.isocenters_pix[0][3, 2] = x_left - 10
-
-        # For both the models, if the isocenter is on the backbone.
-        if x_left < processing_output.isocenters_pix[0][2, 2] < x_right:
-            processing_output.jaws_X_pix[0][2, 0] = (
-                (x_left - processing_output.isocenters_pix[0][2, 2] + 1)
-                * aspect_ratio
-                / 2
-            )
-            processing_output.jaws_X_pix[0][3, 1] = (
-                (x_right - processing_output.isocenters_pix[0][2, 2] - 1)
-                * aspect_ratio
-                / 2
-            )
-
-        self.move_backbone_fields(aspect_ratio, processing_output, x_right, x_left)
-
-        # Set distance between the last two iso only for body model to have symmetric fields
-        if MODEL == "body" and processing_output.isocenters_pix[0][2, 2] < x_left:
-            translation = 0.5 * (
-                (
-                    processing_output.isocenters_pix[0][2, 2]
-                    + processing_output.jaws_X_pix[0][3, 0] / aspect_ratio
-                )
-                - (
-                    processing_output.isocenters_pix[0][0, 2]
-                    + processing_output.jaws_X_pix[0][1, 1] / aspect_ratio
-                )
-                + (
-                    processing_output.isocenters_pix[0][4, 2]
-                    + processing_output.jaws_X_pix[0][5, 0] / aspect_ratio
-                )
-                - (
-                    processing_output.isocenters_pix[0][2, 2]
-                    + processing_output.jaws_X_pix[0][3, 1] / aspect_ratio
-                )
-            )
-
-            # Pelvis isocenters
-            processing_output.isocenters_pix[0][2, 2] = (
-                processing_output.isocenters_pix[0][0, 2]
-                + processing_output.jaws_X_pix[0][1, 1] / aspect_ratio
-                + translation
-                - processing_output.jaws_X_pix[0][3, 0] / aspect_ratio
-            )
-            processing_output.isocenters_pix[0][3, 2] = (
-                processing_output.isocenters_pix[0][0, 2]
-                + processing_output.jaws_X_pix[0][1, 1] / aspect_ratio
-                + translation
-                - processing_output.jaws_X_pix[0][3, 0] / aspect_ratio
-            )
-
-            # Abdomen isocenters
-            processing_output.isocenters_pix[0][4, 2] = (
-                processing_output.isocenters_pix[0][3, 2]
-                + processing_output.isocenters_pix[0][6, 2]
-            ) / 2
-            processing_output.isocenters_pix[0][5, 2] = (
-                processing_output.isocenters_pix[0][3, 2]
-                + processing_output.isocenters_pix[0][6, 2]
-            ) / 2
-
-            self.move_backbone_fields(aspect_ratio, processing_output, x_right, x_left)
-
-        # Move back fields for arms model
-        if MODEL == "arms" and processing_output.isocenters_pix[0][2, 2] > x_right:
-            processing_output.jaws_X_pix[0][0, 1] = (
-                x_right - processing_output.isocenters_pix[0][0, 2] - 1
-            ) * aspect_ratio
-            processing_output.jaws_X_pix[0][3, 0] = (
-                (x_left - processing_output.isocenters_pix[0][2, 2]) + 1
-            ) * aspect_ratio
-
-        ### check fields' aperture
-        for jaw_x, jaw_y in zip(
-            processing_output.jaws_X_pix[0], processing_output.jaws_Y_pix[0]
-        ):
-            for i in range(
-                2
-            ):  # Divide by pix_spacing/slice_thickness because I need to change unite measure: mm -> pixel
-                if np.abs(jaw_x[i]) > 200 / pix_spacing:
-                    print(
-                        "The aperture on x was",
-                        jaw_x[i],
-                        "now is setted on:",
-                        200 / pix_spacing * (-1) ** (i + 1),
-                    )
-
-                    jaw_x[i] = 200 / pix_spacing * (-1) ** (i + 1)
-
-                if np.abs(jaw_y[i]) > 200 / slice_thickness:
-                    print(
-                        "The aperture on y was",
-                        jaw_y[i],
-                        "now is setted on:",
-                        200 / slice_thickness * (-1) ** (i + 1),
-                    )
-                    jaw_y[i] = 200 / slice_thickness * (-1) ** (i + 1)
+        # optimize function
+        local_optimization.optimize()
 
         if single_fig:
             self.single_figure_plot(
@@ -665,15 +555,6 @@ class Visualize:
                 slice_thickness,  # pyright: ignore[reportGeneralTypeIssues]
                 mse=mse,
             )
-
-    def move_backbone_fields(self, aspect_ratio, processing_output, x_right, x_left):
-        if processing_output.isocenters_pix[0][2, 2] < x_left:
-            processing_output.jaws_X_pix[0][2, 1] = (
-                x_right - processing_output.isocenters_pix[0][2, 2] - 1
-            ) * aspect_ratio
-            processing_output.jaws_X_pix[0][5, 0] = (
-                x_left - processing_output.isocenters_pix[0][4, 2] + 1
-            ) * aspect_ratio
 
     def single_figure_plot(
         self,
@@ -837,86 +718,3 @@ class Visualize:
 
         plt.savefig(os.path.join(real_img_path, f"output_test_{patient_idx}"), dpi=2000)
         plt.close()
-
-    def find_fields_coord(self, patient_index: int, iso: np.ndarray) -> tuple[int, int]:
-        iso_on_arms = self.df_patient_info["IsocenterOnArms"].to_numpy().astype(bool)
-        ptv_mask = self.ptv_masks[patient_index]
-
-        if iso_on_arms[patient_index]:
-            a = (iso[0, 2] + iso[2, 2]) / 2
-        else:
-            a = (iso[0, 2] + iso[2, 2]) / 2 + 10
-        b = (iso[2, 2] + iso[6, 2]) / 2
-        search_space = {"x_0": np.arange(a, b, 1, dtype=int)}
-
-        def loss(pos_new):
-            x = pos_new["x_0"]
-            score = np.sum(ptv_mask[:, x])
-            return -score
-
-        opt = GridSearchOptimizer(search_space)
-        opt.search(loss, n_iter=search_space["x_0"].shape[0], verbosity=False)
-
-        best_x_pixel = opt.best_value[0]
-        x_com = int(ndimage.center_of_mass(self.image_interim)[1])
-        y_pixels = np.concatenate(
-            (
-                np.arange(x_com - 115, x_com - 50),
-                np.arange(x_com + 50, x_com + 115),
-            )
-        )
-
-        min_pos_x_right = best_x_pixel
-        min = 512
-        for j in y_pixels:
-            count = 0
-            for i in range(40):
-                if not ptv_mask[j, best_x_pixel + i]:  # pixel is background
-                    count += 1
-                    if (
-                        ptv_mask[j, best_x_pixel + i]
-                        != ptv_mask[j, best_x_pixel + i + 1]
-                    ):
-                        break
-                if ptv_mask[j, best_x_pixel + i]:  # pixel in mask
-                    count = np.inf  # count == np.inf if first pixel is in mask
-                    break
-
-            # Assumption: at least one pixel along j is background
-            if min > count:
-                min = count
-                min_pos_x_right = best_x_pixel + count
-
-        assert (
-            min_pos_x_right != best_x_pixel
-        ), "Optimization has not found the correct position"
-
-        min_pos_x_left = best_x_pixel
-        min = 512
-        for j in y_pixels:
-            count = 0
-            for i in range(40):
-                if not ptv_mask[j, best_x_pixel - i]:  # pixel is background
-                    count += 1
-                    if (
-                        ptv_mask[j, best_x_pixel - i]
-                        != ptv_mask[j, best_x_pixel - i - 1]
-                    ):
-                        break
-                if ptv_mask[j, best_x_pixel - i]:  # pixel in mask
-                    count = np.inf  # count == np.inf if first pixel is in mask
-                    break
-
-            # Assumption: at least one pixel along j is background
-            if min > count:
-                min = count
-                min_pos_x_left = best_x_pixel - count
-
-        assert (
-            min_pos_x_left != best_x_pixel
-        ), "Optimization has not found the correct position"
-
-        return (
-            min_pos_x_right,
-            min_pos_x_left,
-        )

@@ -187,8 +187,8 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
             "train_img",  # pyright: ignore[reportGeneralTypeIssues]
         )
         viz = Visualize(self.logger.log_dir)
-        vis_image_train = x_train.numpy()[0, 0, :, :]
-        vis_image_test = x.numpy()[0, 0, :, :]
+        vis_image_train = x_train.numpy()[0, :, :, :]
+        vis_image_test = x.numpy()[0, :, :, :]
         # Two plots, first one for the train and the second for the test images
         viz.plot_img(
             vis_image_train,

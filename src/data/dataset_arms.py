@@ -5,9 +5,29 @@ from src.data.dataset import Dataset
 
 
 class DatasetArms(Dataset):
-    """Dataset class to load and stratify data"""
+    """
+    A dataset class for loading and stratifying the imaging data with isocenters on the arms.
+
+    This class is designed to work with patients with isocenters are positioned on the arms.
+    It provides methods for loading and stratifying the data, as well as creating unique output configurations
+    for model input.
+
+    Attributes:
+        - df_patient_info (pd.DataFrame): DataFrame containing patient information with isocenter details.
+
+    Methods:
+        - train_val_test_split(): Split the dataset into train, validation, and test sets in a stratified manner.
+        - unique_output(isocenters_pix_flat, jaws_X_pix_flat, jaws_Y_pix_flat): Create a new data configuration
+          for the model input with isocenters on the arms.
+    """
 
     def __init__(self) -> None:
+        """
+        Initialize the `DatasetArms` class.
+
+        This constructor initializes the class and filters the dataset to work only with entries where isocenters
+        are positioned on the arms.
+        """
         super().__init__()
         iso_on_arms = self.df_patient_info.IsocenterOnArms.to_numpy(dtype=bool)
         self.df_patient_info = self.df_patient_info.iloc[iso_on_arms]
@@ -15,20 +35,15 @@ class DatasetArms(Dataset):
     def train_val_test_split(
         self,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Get the train/val/test indexes :
-            - 10% patients for test set
-            - 80% for training
-            - 10% for validation
-
-        Args:
-            test_set (str): The strategy to split the test data based on the  class labels (collimator angle).
-
+        """
+        Split the dataset into training, validation, and test sets.
 
         Returns:
-            tuple(np.ndarray, np.ndarray): train, val, and test index splits
+            tuple(np.ndarray, np.ndarray, np.ndarray): Index splits for train, validation, and test sets.
 
         Notes:
-            The dataset split is stratified by the class labels (collimator angle)
+            - The dataset split is stratified by the class labels (collimator angle).
+            - The default split ratio is 80% for training, 10% for validation, and 10% for testing.
         """
 
         _, test_idx = train_test_split(
