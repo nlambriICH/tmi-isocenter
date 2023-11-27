@@ -8,7 +8,7 @@ import matplotlib.patches as mpatches
 from src.data.processing import Processing
 from scipy import ndimage
 from src.config.constants import MODEL
-from src.utils.optimization_cnn import Optimization
+from src.utils.local_optimization import Optimization
 
 
 class Visualize:
