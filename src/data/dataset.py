@@ -80,13 +80,15 @@ class Dataset:
         _, test_idx = train_test_split(
             self.df_patient_info.index,
             train_size=0.91,
-            stratify=self.angle_class[self.df_patient_info.index],
             random_state=42,
-        )  # get index as a balance test_set
-        test_idx = test_idx.to_numpy(dtype=np.uint8)
+            stratify=self.angle_class[self.df_patient_info.index],
+        )
+        test_idx = test_idx.to_numpy()
         train_idx = self.df_patient_info.index[
-            ~self.df_patient_info.index.isin(test_idx)  # remove test_idx from dataframe
-        ].to_numpy(dtype=np.uint8)
+            ~self.df_patient_info.index.isin(
+                test_idx
+            )  # remove test_idx from data frame
+        ].to_numpy()
 
         train_idx, val_idx = train_test_split(
             train_idx,
@@ -111,7 +113,7 @@ class Dataset:
 
     def augment_train(self):
         """
-        Apply affine data augmentation to training data.
+        Augment training data.
 
         """
         aug = Augmentation(
@@ -132,12 +134,22 @@ class Dataset:
             self.angle_class,
             self.df_patient_info,
             train_index,
-        ) = aug.augment_affine()
+        ) = aug.augment()
 
         self.num_patients = self.masks2d.shape[0]
+
         return train_index
 
     def get_data_Xy(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """
+        Prepares and returns the input and target data for training a model.
+
+        Returns:
+        tuple[np.ndarray, np.ndarray, np.ndarray]: A tuple containing:
+            - Input data (X): Array of images of shape (C, H, W).
+            - Target data (y_reg): Array of unique outputs derived from isocenters and jaws positions.
+            - Additional target data (angle_class): 1D array representing the angle class for the pelvic collimator.
+        """
         isocenters_pix_flat = self.isocenters_pix.reshape(self.num_patients, -1)
         jaws_X_pix_flat = self.jaws_X_pix.reshape(self.num_patients, -1)
         jaws_Y_pix_flat = self.jaws_Y_pix.reshape(self.num_patients, -1)
@@ -155,7 +167,7 @@ class Dataset:
         self, isocenters_pix_flat, jaws_X_pix_flat, jaws_Y_pix_flat
     ) -> np.ndarray:
         """
-        Create a new data configuration for the input of the models.
+        Create the target array with minimum elements (only unique information).
 
         Args:
             isocenters_pix_flat (np.ndarray): Flat array containing the isocenter values.
@@ -180,21 +192,23 @@ class Dataset:
             unique_iso_idx = [
                 30,
                 33,
-            ]  # indexes: 0,1= one coord. for x,y axes; 30,33 = two different X-coord. on the arms;
+            ]  # indexes: 0,1 = one coord. for x,y axes; 30,33 = two different X-coord on the arms
             y_iso_new2 = np.zeros(shape=(6), dtype=float)
             y_iso_new1 = iso[unique_iso_idx]
             for z in range(6):
                 y_iso_new2[z] = iso[
                     z * 3 * 2 + 2
-                ]  # Z-coord one for every couple of iso.
-            # X_Jaws
-            usless_idx = [
+                ]  # Z-coord one for every couple of iso
+
+            # X_Jaws: take all the values except the for thorax, chest and head
+            unused_idx = [
                 11,
                 15,
                 19,
-            ]  # with X_Jaw I take all the values except the for thorx, chest and head where I use the simmetry (so 1 param for 2 fields) to hug the relative iso.
-            y_jaw_X = np.delete(jaw_X_pix, usless_idx)
-            # Y_Jaws
+            ]
+            y_jaw_X = np.delete(jaw_X_pix, unused_idx)
+
+            # Y_Jaws: exploit the body's symmetry
             unique_Y_idx = [
                 0,
                 2,
@@ -206,13 +220,14 @@ class Dataset:
                 19,
                 20,
                 22,
-            ]  # Here we exploit the body's symmetry.
-            # We keep [0,2] for the legs,  4 = one values fields (pelvi+chest), 8= third iso, [16,17,18,19] for the head, [20,22]= for the arms.
+            ]
+            # Keep [0,2] legs, 4 = one values fields (pelvis + chest), 8 = third iso, [16,17,18,19] head, [20,22] = arms
             y_jaw_Y = jaw_Y_pix[unique_Y_idx]
             y_reg_local = np.concatenate(
                 (y_iso_new1, y_iso_new2, y_jaw_X, y_jaw_Y), axis=0
             )
             y_reg[i] = y_reg_local
+
         return y_reg
 
     @property

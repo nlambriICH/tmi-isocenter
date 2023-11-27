@@ -18,7 +18,7 @@ class Processing:
     ) -> None:
         """
         Args:
-            masks (list[np.ndarray]): List of num_patients arrays of shape (512, height) containing the masks to be resized.
+            masks (list[np.ndarray]): List of num_patients arrays of shape (512, height, C) containing the image to be resized.
             isocenters_pix (np.ndarray): Array of shape (num_patients, iso_per_patient, 3) containing the isocenters in pixel coordinates.
             jaws_X_pix (np.ndarray): Array of shape (num_patients, iso_per_patient, 2) containing the X-jaws apertures in pixel coordinates.
             jaws_Y_pix (np.ndarray): Array of shape (num_patients, iso_per_patient, 2) containing the Y-jaws apertures in pixel coordinates.
@@ -128,7 +128,7 @@ class Processing:
         self: The modified object with rotated masks and isocenters.
 
         Notes:
-            For a correct use of this function, we suggest to utilize it only with orizontal images.
+            For a correct use of this function, we suggest to utilize it only with horizontal images.
         """
         masks_rot = []
         isos_kps_img_rot3D = np.zeros(
@@ -290,9 +290,10 @@ class Processing:
     def get_jaws_Y_pix(self) -> np.ndarray:
         return self.jaws_Y_pix
 
-    def trasform(self):
+    def transform(self):
         """
-        Sequence transformation composed of resize, 90 degrees CCW rotation, and scaling of masks and keypoints (isocenters and jaw apertures).
+        Sequence transformation composed of resize, 90 degrees CCW rotation,
+        and scaling of masks and keypoints (isocenters and jaw apertures).
 
         Raises:
             AssertionError: If any of the masks does not have a height of 512 pixels.
@@ -301,7 +302,8 @@ class Processing:
             self: The modified object with rotated masks and isocenters.
 
         Notes:
-            This function expects as input masks where height and width correspond to x-axis and z-axis in the patient's coord system ("horizontal" image).
+            This function expects as input masks where height and width correspond to x-axis and z-axis
+            in the patient's coord system ("horizontal" image).
         """
         assert np.all(
             [mask.shape[0] == 512 for mask in self.masks]
@@ -352,9 +354,10 @@ class Processing:
 
         return self
 
-    def inverse_trasform(self):
+    def inverse_transform(self):
         """
-        Sequence transformation composed of scaling, 90 degrees CW rotation, and resize to recover the original values of masks and keypoints (isocenters and jaw apertures).
+        Sequence transformation composed of scaling, 90 degrees CW rotation, and resize
+        to recover the original values of masks and keypoints (isocenters and jaw apertures).
 
         Raises:
             AssertionError: If any of the masks does not have a height of 512 pixels.
@@ -363,7 +366,8 @@ class Processing:
             self: The modified object with rotated masks and isocenters.
 
         Notes:
-            This function expects as input masks where height and width correspond to z-axis and x-axis in the patient's coord system ("vertical" image).
+            This function expects as input masks where height and width correspond to z-axis and x-axis
+            in the patient's coord system ("vertical" image).
         """
         assert np.all(
             [mask.shape[0] == 512 for mask in self.masks]
@@ -427,21 +431,21 @@ class Processing:
         aug: iaa.Sequential,
     ):
         """
-        Apply data augmentation to a 2D mask and associated keypoints.
+        Apply transformations to a 2D mask and associated keypoints.
 
         Parameters:
         - masks_aug (list[np.ndarray]): List to store augmented 2D masks.
         - isos_kps_img_aug3D (np.ndarray): Array to store augmented 3D keypoints.
         - jaws_Y_pix_aug (np.ndarray): Array to store augmented Y apertures.
-        - i (int): Index indicating the current augmentation iteration.
+        - i (int): Index indicating the current transformed mask.
         - mask2d (np.ndarray): 2D mask to be augmented.
         - iso_pix (np.ndarray): 2D array containing the original isocenter keypoints.
         - jaw_Y_pix (np.ndarray): 1D array containing original Y apertures.
         - width_resize (int): Width to which Y apertures should be resized.
-        - aug (imgaug.augmenters.Sequential): Augmentation sequence applied to the mask.
+        - aug (imgaug.augmenters.Sequential): Transformation sequence applied to the mask.
 
         Note:
-        - Augmentation is applied to the 2D mask and its associated keypoints (isos_kps_img).
+        - Transformations are applied to the 2D mask and its associated keypoints (isos_kps_img).
         """
 
         iso_kps_img = KeypointsOnImage(
@@ -582,4 +586,4 @@ if __name__ == "__main__":
         coll_angles,
     )
 
-    processing.trasform().save_data()
+    processing.transform().save_data()
