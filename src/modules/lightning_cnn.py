@@ -1,6 +1,4 @@
 """Lightning module for CNN training"""
-import os
-import numpy as np
 import torch
 import torch.nn.functional as F
 import lightning.pytorch as pl
@@ -174,37 +172,36 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
             y_train_reg_hat, y_train_cls_hat = self.cnn(x_train)
         else:
             y_reg_hat = self.cnn(x)
+            y_cls_hat = torch.zeros(1)
             test_mse_loss = self.weighted_mse_loss(y_reg_hat, y_reg)
             metrics = {
                 "test_mse_loss": test_mse_loss,
             }
-            y_cls_hat = torch.zeros(1)
+            y_train_reg_hat = self.cnn(x_train)
             y_train_cls_hat = torch.zeros(1)
-        y_train_reg_hat = self.cnn(x_train)
+
         self.log_dict(metrics)
-        # check overfitting
-        path = os.path.join(
-            self.logger.log_dir,  # pyright: ignore[reportGeneralTypeIssues, reportOptionalMemberAccess]
-            "train_img",  # pyright: ignore[reportGeneralTypeIssues]
+
+        # Check overfitting
+        viz = Visualize(
+            self.logger.log_dir  # pyright: ignore[reportOptionalMemberAccess]
         )
-        viz = Visualize(self.logger.log_dir)
-        vis_image_train = x_train.numpy()[0, :, :, :]
-        vis_image_test = x.numpy()[0, :, :, :]
-        # Two plots, first one for the train and the second for the test images
+
+        # Two plots: (1) train (overfitting) and (2) test images
         viz.plot_img(
-            vis_image_train,
+            input_img=x_train.numpy()[0],
             patient_idx=int(train_index.item()),
             output=y_train_reg_hat[0],
-            path=path,
-            coll_angle_hat=y_cls_hat,
+            path=self.logger.log_dir,  # pyright: ignore[reportGeneralTypeIssues,reportOptionalMemberAccess]
+            coll_angle_hat=y_train_cls_hat,
             single_fig=True,
         )
         viz.plot_img(
-            vis_image_test,
+            input_img=x.numpy()[0],
             patient_idx=int(test_idx.item()),
             output=y_reg_hat[0],
             path=self.logger.log_dir,  # pyright: ignore[reportGeneralTypeIssues,reportOptionalMemberAccess]
-            coll_angle_hat=y_train_cls_hat,
+            coll_angle_hat=y_cls_hat,
             mse=test_mse_loss,
         )
 

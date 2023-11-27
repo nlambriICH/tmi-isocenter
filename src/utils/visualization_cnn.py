@@ -7,9 +7,8 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from src.data.processing import Processing
 from scipy import ndimage
-import yaml
 from src.config.constants import MODEL
-from src.utils.optimization_cnn import optimization
+from src.utils.optimization_cnn import Optimization
 
 
 class Visualize:
@@ -19,7 +18,7 @@ class Visualize:
         with np.load(r"data\raw\ptv_masks2D.npz") as npz_masks2d:
             self.ptv_masks = list(npz_masks2d.values())
         with np.load(r"data\raw\ptv_imgs2D.npz") as npz_masks2d:
-            self.ptv_hu = list(npz_masks2d.values())
+            self.img_hu = list(npz_masks2d.values())
         self.isocenters_pix = np.load(r"data\raw\isocenters_pix.npy")
         self.jaws_X_pix = np.load(r"data\raw\jaws_X_pix.npy")
         self.jaws_Y_pix = np.load(r"data\raw\jaws_Y_pix.npy")
@@ -28,13 +27,17 @@ class Visualize:
         self.original_sizes_col_idx = self.df_patient_info.columns.get_loc(
             key="OrigMaskShape_z"
         )
-        self.slice_tickness_col_idx = self.df_patient_info.columns.get_loc(
+        self.slice_thickness_col_idx = self.df_patient_info.columns.get_loc(
             key="SliceThickness"
         )
         self.model_dir = log_dic
 
     def build_output(
-        self, y_hat: torch.Tensor, patient_idx: int, aspect_ratio: float
+        self,
+        y_hat: torch.Tensor,
+        patient_idx: int,
+        aspect_ratio: float,
+        input_img: np.ndarray,
     ) -> torch.Tensor:
         """
         Build the output tensor based on the predicted values and patient information.
@@ -42,7 +45,8 @@ class Visualize:
         Parameters:
         - y_hat (torch.Tensor): Predicted tensor from the model.
         - patient_idx (int): Index of the patient in the test set, to be plotted.
-        - aspect_ratio (float): Aspect ratio used durig the CT.
+        - aspect_ratio (float): Aspect ratio of the images.
+        - input_img (np.ndarray): The input image with shape (C, H, W).
 
         Returns:
         - torch.Tensor: Output tensor representing the treatment plan.
@@ -51,10 +55,10 @@ class Visualize:
         - The function constructs a 1D output tensor with 84 elements.
         """
         output = np.zeros(shape=(84))
-        norm = aspect_ratio * self.ptv_hu[patient_idx].shape[1] / 512
+        norm = aspect_ratio * self.img_hu[patient_idx].shape[1] / 512
         slice_thickness = float(
             self.df_patient_info.iloc[
-                patient_idx, self.slice_tickness_col_idx
+                patient_idx, self.slice_thickness_col_idx
             ]  # pyright: ignore[reportGeneralTypeIssues]
         )
         original_size = int(
@@ -62,17 +66,15 @@ class Visualize:
                 patient_idx, self.original_sizes_col_idx
             ]  # pyright: ignore[reportGeneralTypeIssues]
         )
+
         # Isocenter indexes
         index_X = [0, 3, 6, 9, 12, 15, 18, 21, 24, 27]
         index_Y = [1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34]
-        self.x_com = ndimage.center_of_mass(self.image_interim)[1]
-        output[index_X] = (
-            self.x_com
-            / self.image_interim.shape[0]  # pyright: ignore[reportGeneralTypeIssues]
-        )  # x coord repeated 8 times + 2 times for iso thorax
-        output[
-            index_Y
-        ] = 0.5  # y coord repeated 8 times + 2 times for iso thorax, set to 0
+        x_com = ndimage.center_of_mass(input_img[0])[1]
+        # x coord repeated 8 times + 2 times for iso thorax
+        output[index_X] = x_com / input_img[0].shape[0]
+        # y coord repeated 8 times + 2 times for iso thorax, set to 0
+        output[index_Y] = 0.5
 
         if y_hat.shape[0] == 39:  # whole model
             output[30] = y_hat[0].item()  # x coord right arm
@@ -201,7 +203,7 @@ class Visualize:
                 output[76 + i] = y_hat[26 + i].item()  # apertures for the head
 
         elif y_hat.shape[0] == 25:
-            norm = aspect_ratio * self.ptv_hu[patient_idx].shape[1] / 512
+            norm = aspect_ratio * self.img_hu[patient_idx].shape[1] / 512
             output[30] = 0  # x coord right arm
             output[33] = 0  # x coord left arm
 
@@ -229,7 +231,7 @@ class Visualize:
             output[50] = y_hat[14]  # chest iso
 
             # Overlap fields
-            output[41] = (output[8] - output[14] + 0.01) * norm + output[46]  # abdom
+            output[41] = (output[8] - output[14] + 0.01) * norm + output[46]  # abdomen
             output[45] = (output[14] - output[20] + 0.03) * norm + output[50]  # third
             output[49] = (output[20] - output[26] + 0.02) * norm + output[54]  # chest
 
@@ -262,24 +264,7 @@ class Visualize:
                     output[81 + 2 * i] = 0
 
                 output[76 + i] = y_hat[21 + i].item()  # apertures for the head
-        path = os.path.join(
-            self.model_dir,  # pyright: ignore[reportGeneralTypeIssues, reportOptionalMemberAccess]
-            "hparams.yaml",
-        )
-        with open(path, "r+") as file:
-            data = yaml.safe_load(file)  # that is necessary
-            distance_between_isocenters = (output[2] - output[26]) * (
-                slice_thickness * original_size
-            )
-            dist_pat = "distance first last iso_" + str(patient_idx)
-            row_to_append = {dist_pat: float(distance_between_isocenters)}
-            yaml.dump(row_to_append, file, default_flow_style=False)
 
-        if output[2] - output[26] > (840 / (slice_thickness * original_size)):
-            shift_measure = (output[2] - output[26]) - (
-                840 / (slice_thickness * original_size)
-            )
-            output[[2, 5]] = output[2] - shift_measure
         return torch.from_numpy(output)
 
     def extract_original_data(
@@ -451,13 +436,11 @@ class Visualize:
 
     def plot_img(
         self,
-        img_interim_3D: np.ndarray,
+        input_img: np.ndarray,
         patient_idx: int,
         output: torch.Tensor,
         path: str,
-        coll_angle_hat: torch.Tensor = torch.ones(
-            1
-        ),  # Default 90, if isn't important visualize the angle.
+        coll_angle_hat: torch.Tensor = torch.ones(1),
         mse: torch.Tensor = torch.tensor(0),
         single_fig: bool = False,
     ) -> None:
@@ -465,16 +448,20 @@ class Visualize:
         Generates and saves a plot of two images for a given patient: the original image and a transformed image.
 
         Parameters:
+            input_img : np.ndarray
+                The input image with shape (C, H, W).
             patient_idx : int
-                The index of the patient to plot.
+                The index of the patient in the dataset.
             output : torch.Tensor
-                A 1D NumPy array containing the output of a model for the specified patient.
+                A 1D NumPy array containing the output of the model.
             path : str
                 The path where the plot image will be saved.
-            mse: torch.Tensor
-                MSE loss added in the figure title of separate plots.
+            coll_angle_hat : torch.Tensor
+                The predicted collimator angle for the pelvic fields. Defaults to 1 (90 deg).
+            mse : torch.Tensor
+                MSE loss added in the figure title of separate plots. Defaults to 0.
             single_fig : bool
-                Whether to plot ground thruth and predictions in the same image
+                Whether to plot ground truth and predictions in the same image.
 
         Returns:
             None
@@ -483,14 +470,11 @@ class Visualize:
         ------
         - The function calls the `extract_data` function to reorganize the CNN output.
         """
-        self.image_interim_3D = img_interim_3D
-        self.image_interim = img_interim_3D[0, :, :]
-        self.image_ptv = img_interim_3D[1, :, :]
         pix_spacing_col_idx = self.df_patient_info.columns.get_loc(key="PixelSpacing")
 
         pix_spacing = self.df_patient_info.iloc[patient_idx, pix_spacing_col_idx]
         slice_thickness = self.df_patient_info.iloc[
-            patient_idx, self.slice_tickness_col_idx
+            patient_idx, self.slice_thickness_col_idx
         ]
         aspect_ratio = (
             slice_thickness / pix_spacing
@@ -503,7 +487,7 @@ class Visualize:
         )
 
         if output.shape[0] < 84:
-            output = self.build_output(output, patient_idx, aspect_ratio)
+            output = self.build_output(output, patient_idx, aspect_ratio, input_img)
 
         isocenters_hat, jaws_X_pix_hat, jaws_Y_pix_hat = self.extract_original_data(
             output
@@ -523,35 +507,23 @@ class Visualize:
             angles[11] = 5
 
         processing_output = Processing(
-            [self.image_ptv],  # interim image
+            [np.transpose(input_img, (1, 2, 0))],
             isocenters_hat,
             jaws_X_pix_hat,
             jaws_Y_pix_hat,
             angles,
         )
-
-        ################################# TO FIX #######################à
-        processing_optimiz = Processing(
-            [self.image_ptv],  # interim image
-            isocenters_hat,
-            jaws_X_pix_hat,
-            jaws_Y_pix_hat,
-            angles,
-        )
-        #####################################à
 
         # Retrieve information of the original shape
         processing_output.original_sizes = [original_size]
-        processing_output.inverse_trasform()
+        processing_output.inverse_transform()
 
-        # I create the istance from optimization class
-        local_optimization = optimization(
+        local_optimization = Optimization(
             patient_idx=patient_idx,
-            output_proc=processing_output,
-            img=self.image_interim_3D,
+            processing_output=processing_output,
+            img=input_img,
             aspect_ratio=aspect_ratio,
         )
-        # optimize function
         local_optimization.optimize()
 
         if single_fig:
@@ -599,8 +571,8 @@ class Visualize:
         """
         aspect_ratio = slice_thickness / pix_spacing
 
-        plt.imshow(self.ptv_hu[patient_idx], cmap="gray", aspect=1 / aspect_ratio)
-        plt.contourf(self.ptv_hu[patient_idx], alpha=0.25)
+        plt.imshow(self.img_hu[patient_idx], cmap="gray", aspect=1 / aspect_ratio)
+        plt.contourf(self.img_hu[patient_idx], alpha=0.25)
 
         plt.scatter(
             processing_output.isocenters_pix[0, :, 2],
@@ -618,7 +590,7 @@ class Visualize:
             pix_spacing,
         )
 
-        # Plot ground thruth
+        # Plot ground truth
         plt.scatter(
             self.isocenters_pix[patient_idx, :, 2],
             self.isocenters_pix[patient_idx, :, 0],
@@ -640,13 +612,11 @@ class Visualize:
         blue_patch = mpatches.Patch(color="blue", label="Real")
         plt.legend(handles=[red_patch, blue_patch], loc=0, frameon=True)
 
-        eval_img_path = os.path.join(path, "eval_img")
+        eval_img_path = os.path.join(path, "img", "train")
         if not os.path.exists(eval_img_path):
             os.makedirs(eval_img_path)
 
-        plt.savefig(
-            os.path.join(eval_img_path, f"output_train_{patient_idx}"), dpi=2000
-        )
+        plt.savefig(os.path.join(eval_img_path, f"train_{patient_idx}"))
         plt.close()
 
     def separate_plots(
@@ -679,8 +649,7 @@ class Visualize:
         aspect_ratio = slice_thickness / pix_spacing
 
         # Plot predictions
-        plt.imshow(self.ptv_hu[patient_idx], cmap="gray", aspect=1 / aspect_ratio)
-        # plt.contourf(processing_raw.masks[patient_idx], alpha=0.25)
+        plt.imshow(self.img_hu[patient_idx], cmap="gray", aspect=1 / aspect_ratio)
         plt.scatter(
             processing_output.isocenters_pix[0, :, 2],
             processing_output.isocenters_pix[0, :, 0],
@@ -697,19 +666,16 @@ class Visualize:
             pix_spacing,
             single_fig=True,
         )
-        plt.title(f"MSE loss: {mse}")
-        predict_img_path = os.path.join(path, "predict_img")
+        plt.title(f"MSE loss: {mse:.6f}")
+        predict_img_path = os.path.join(path, "img", "test", "predicted")
         if not os.path.exists(predict_img_path):
             os.makedirs(predict_img_path)
 
-        plt.savefig(
-            os.path.join(predict_img_path, f"output_test_{patient_idx}"), dpi=2000
-        )
+        plt.savefig(os.path.join(predict_img_path, f"test_{patient_idx}"))
         plt.close()
 
-        # Plot ground thruth
-        plt.imshow(self.ptv_hu[patient_idx], cmap="gray", aspect=1 / aspect_ratio)
-        # plt.contourf(processing_raw.masks[patient_idx], alpha=0.25)
+        # Plot ground truth
+        plt.imshow(self.img_hu[patient_idx], cmap="gray", aspect=1 / aspect_ratio)
         plt.scatter(
             self.isocenters_pix[patient_idx, :, 2],
             self.isocenters_pix[patient_idx, :, 0],
@@ -728,9 +694,9 @@ class Visualize:
             single_fig=True,
         )
 
-        real_img_path = os.path.join(path, "real_img")
+        real_img_path = os.path.join(path, "img", "test", "ground_truth")
         if not os.path.exists(real_img_path):
             os.makedirs(real_img_path)
 
-        plt.savefig(os.path.join(real_img_path, f"output_test_{patient_idx}"), dpi=2000)
+        plt.savefig(os.path.join(real_img_path, f"test_{patient_idx}"))
         plt.close()
