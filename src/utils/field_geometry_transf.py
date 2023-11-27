@@ -96,7 +96,7 @@ def transform_field_geometry(
             for each field in the original coordinate system.
         jaw_Y_orig (np.ndarray): Array of shape (n_fields, 2) containing the Y apertures
             for each field in the original coordinate system.
-        from_to (str): the orignal and target coordinate system. Allowed values: "pat_pix" and "pix_pat". Default is "pat_pix".
+        from_to (str): the original and target coordinate system. Allowed values: "pat_pix" and "pix_pat". Default is "pat_pix".
 
     Returns:
         tuple[np.ndarray, np.ndarray, np.ndarray]: A tuple containing the transformed isocenters,

@@ -30,7 +30,8 @@ if __name__ == "__main__":
         lightning_cnn = LitCNN()
         name = "whole_model"
 
-    train_index, val_idx, test_index = dataset.train_val_test_split()
+    _, val_idx, test_index = dataset.train_val_test_split()
+    train_index = dataset.augment_train()
     masks_aug, y_reg, y_cls = dataset.get_data_Xy()
 
     (
@@ -63,35 +64,34 @@ if __name__ == "__main__":
             ),
         )
     )
-    test_len = len(test_index)
+
     train_loader = DataLoader(
         TensorDataset(
             masks_train,
             y_reg_train,
             y_cls_train,
         ),
-        num_workers=1,
+        num_workers=16,
         batch_size=10,
         shuffle=True,
     )
+
     val_loader = DataLoader(
         TensorDataset(masks_val, y_reg_val, y_cls_val),
-        num_workers=1,
+        num_workers=16,
     )
+
+    test_len = test_index.shape[0]
     test_loader = DataLoader(
         TensorDataset(
             masks_test,
             y_reg_test,
             y_cls_test,
             test_idx,
-            masks_train[
-                0:test_len
-            ],  # it switches if the dataset changes: [0:11] or [0:3]
-            train_index[
-                0:test_len
-            ],  # it switches if the dataset changes: [0:11] or [0:3]
+            masks_train[0:test_len],  # mask_train = [0:11] or [0:3]
+            train_index[0:test_len],  # mask_train = [0:11] or [0:3]
         ),
-        num_workers=1,
+        num_workers=16,
     )
 
     trainer = pl.Trainer(
@@ -101,16 +101,18 @@ if __name__ == "__main__":
             log_graph=True,
         ),  # pyright: ignore[reportGeneralTypeIssues]
         callbacks=[  # pyright: ignore[reportGeneralTypeIssues]
-            EarlyStopping(monitor="val_mse_loss", mode="min", patience=10),
+            EarlyStopping(monitor="val_mse_loss", mode="min", patience=7),
             ModelSummary(
                 max_depth=-1
             ),  # print the weights summary of the model when trainer.fit() is called
             LearningRateMonitor(logging_interval="epoch"),
         ],
-        max_epochs=100,
+        max_epochs=50,
         log_every_n_steps=1,
     )
+
     trainer.fit(
         model=lightning_cnn, train_dataloaders=train_loader, val_dataloaders=val_loader
     )
+
     trainer.test(model=lightning_cnn, dataloaders=test_loader)

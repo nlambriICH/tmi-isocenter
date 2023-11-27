@@ -32,19 +32,22 @@ class DatasetBody(Dataset):
             - Specific indices are used to select the unique values from the input arrays.
             Details about the selected indices can be found in the function implementation.
         """
-        y_reg = np.zeros(shape=(self.num_patients, 1, 26), dtype=float)
+        y_reg = np.zeros(shape=(self.num_patients, 1, 25), dtype=float)
         for i, (iso, jaw_X_pix, jaw_Y_pix) in enumerate(
             zip(isocenters_pix_flat, jaws_X_pix_flat, jaws_Y_pix_flat)
         ):
             # Isocenters
-
-            y_iso_new2 = np.zeros(shape=(5), dtype=float)
-            for z in range(5):
+            y_iso_new2 = np.zeros(shape=(4), dtype=float)
+            for z in range(2):
                 y_iso_new2[z] = iso[
                     z * 3 * 2 + 2
-                ]  # Z-coord one for every couple of iso.
-            # X_Jaws
-            usless_idx = [
+                ]  # Z-coord one for every couple of iso
+                y_iso_new2[z + 2] = iso[
+                    (z + 3) * 3 * 2 + 2
+                ]  # Z-coord one for every couple of iso
+
+            # X_Jaws: take all the values except the for thorax, chest and head
+            unused_idx = [
                 5,  # overlap fourth
                 9,  # overlap third
                 11,  # third on iso
@@ -55,9 +58,10 @@ class DatasetBody(Dataset):
                 21,  # arms
                 22,  # arms
                 23,  # arms
-            ]  # with X_Jaw I take all the values except the for thorax, chest and head where I use the simmetry (so 1 param for 2 fields) to hug the relative iso.
-            y_jaw_X = np.delete(jaw_X_pix, usless_idx)
-            # Y_Jaws
+            ]
+            y_jaw_X = np.delete(jaw_X_pix, unused_idx)
+
+            # Y_Jaws: exploit the body's symmetry
             unique_Y_idx = [
                 0,
                 2,
@@ -66,9 +70,10 @@ class DatasetBody(Dataset):
                 17,
                 18,
                 19,
-            ]  # Here we exploit the body's symmetry.
-            # We keep [0,2] for the legs,  4 = one values fields (pelvi+chest), 8= third iso, [16,17,18,19] for the head, [20,22]= for the arms.
+            ]
+            # Keep [0,2] legs, 4 = one values fields (pelvis + chest), 8 = third iso, [16,17,18,19] head, [20,22] = arms
             y_jaw_Y = jaw_Y_pix[unique_Y_idx]
             y_reg_local = np.concatenate((y_iso_new2, y_jaw_X, y_jaw_Y), axis=0)
             y_reg[i] = y_reg_local
+
         return y_reg

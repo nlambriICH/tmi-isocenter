@@ -1,14 +1,12 @@
 """Lightning module for CNN training"""
-import os
 import torch
-from torch import nn
 import torch.nn.functional as F
 import lightning.pytorch as pl
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.optim import Adam
 from torchmetrics.classification import BinaryAccuracy
 from src.models.cnn import CNN
-from src.utils.visualization_cnn import plot_img
+from src.utils.visualization_cnn import Visualize
 from src.config.constants import CLASSIFICATION
 
 
@@ -21,7 +19,6 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
         mse_loss_weight=5.0,
         bcelogits_loss_weight=0.00000001,
         weight=1,
-        activation=nn.ReLU(),
         focus_on=[0, 1],
         filters=4,
         output=39,
@@ -33,15 +30,15 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
                 and angle classification
         """
         super().__init__()
+        self.version = 0
         self.example_input_array = torch.Tensor(
-            32, 3, 512, 512
+            1, 3, 512, 512
         )  # display the intermediate input and output sizes of layers when trainer.fit() is called
         self.classif = CLASSIFICATION
         self.cnn = CNN(
             filters,
             output,
             self.classif,
-            activation,
         )
         self.accuracy = BinaryAccuracy()
         self.learning_rate = learning_rate
@@ -129,8 +126,6 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
             batch_idx (int): batch index
         """
         x, y_reg, y_cls = batch
-        # need additional (batch) dimension because Flatten layer has start_dim=1
-        # x = x.unsqueeze_(0)  # shape=(1, 1, 512, 512)
         y_reg = y_reg.view(1, -1)  # shape=(1, N_out)
         y_cls = y_cls.view(1, -1)  # shape=(1, 1)
 
@@ -150,7 +145,8 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
     def test_step(  # pylint: disable=arguments-differ
         self, batch: list[torch.Tensor], batch_idx: int
     ) -> None:
-        """Test loop
+        """
+        Test loop
 
         Args:
             batch (list[torch.Tensor]): input batch
@@ -176,32 +172,36 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
             y_train_reg_hat, y_train_cls_hat = self.cnn(x_train)
         else:
             y_reg_hat = self.cnn(x)
+            y_cls_hat = torch.zeros(1)
             test_mse_loss = self.weighted_mse_loss(y_reg_hat, y_reg)
             metrics = {
                 "test_mse_loss": test_mse_loss,
             }
-            y_cls_hat = torch.zeros(1)
+            y_train_reg_hat = self.cnn(x_train)
             y_train_cls_hat = torch.zeros(1)
-        y_train_reg_hat = self.cnn(x_train)
+
         self.log_dict(metrics)
-        # check overfitting
-        path = os.path.join(
-            self.logger.log_dir,  # pyright: ignore[reportGeneralTypeIssues, reportOptionalMemberAccess]
-            "train_img",  # pyright: ignore[reportGeneralTypeIssues]
+
+        # Check overfitting
+        viz = Visualize(
+            self.logger.log_dir  # pyright: ignore[reportOptionalMemberAccess]
         )
-        # Two plots, first one for the train and the second for the test images
-        plot_img(
+
+        # Two plots: (1) train (overfitting) and (2) test images
+        viz.plot_img(
+            input_img=x_train.numpy()[0],
             patient_idx=int(train_index.item()),
             output=y_train_reg_hat[0],
-            path=path,
-            coll_angle_hat=y_cls_hat,
+            path=self.logger.log_dir,  # pyright: ignore[reportGeneralTypeIssues,reportOptionalMemberAccess]
+            coll_angle_hat=y_train_cls_hat,
             single_fig=True,
         )
-        plot_img(
+        viz.plot_img(
+            input_img=x.numpy()[0],
             patient_idx=int(test_idx.item()),
             output=y_reg_hat[0],
             path=self.logger.log_dir,  # pyright: ignore[reportGeneralTypeIssues,reportOptionalMemberAccess]
-            coll_angle_hat=y_train_cls_hat,
+            coll_angle_hat=y_cls_hat,
             mse=test_mse_loss,
         )
 

@@ -18,7 +18,7 @@ class Processing:
     ) -> None:
         """
         Args:
-            masks (list[np.ndarray]): List of num_patients arrays of shape (512, height) containing the masks to be resized.
+            masks (list[np.ndarray]): List of num_patients arrays of shape (512, height, C) containing the image to be resized.
             isocenters_pix (np.ndarray): Array of shape (num_patients, iso_per_patient, 3) containing the isocenters in pixel coordinates.
             jaws_X_pix (np.ndarray): Array of shape (num_patients, iso_per_patient, 2) containing the X-jaws apertures in pixel coordinates.
             jaws_Y_pix (np.ndarray): Array of shape (num_patients, iso_per_patient, 2) containing the Y-jaws apertures in pixel coordinates.
@@ -58,7 +58,9 @@ class Processing:
 
         jaws_Y_pix_aug = np.zeros_like(self.jaws_Y_pix)
 
-        resize = iaa.Resize(size={"height": 512, "width": width_resize})
+        resize = iaa.Resize(
+            size={"height": 512, "width": width_resize}, interpolation="nearest"
+        )
 
         for i, (mask2d, iso_pix, jaw_Y_pix) in enumerate(
             zip(self.masks, self.isocenters_pix, self.jaws_Y_pix)
@@ -126,7 +128,7 @@ class Processing:
         self: The modified object with rotated masks and isocenters.
 
         Notes:
-            For a correct use of this function, we suggest to utilize it only with orizontal images.
+            For a correct use of this function, we suggest to utilize it only with horizontal images.
         """
         masks_rot = []
         isos_kps_img_rot3D = np.zeros(
@@ -179,7 +181,9 @@ class Processing:
             zip(self.masks, self.isocenters_pix, self.jaws_Y_pix, self.original_sizes)
         ):
             # Keypoint x: column-wise == dicom-z, keypoint y: row-wise == dicom-x
-            resize = iaa.Resize(size={"height": 512, "width": width_resize})
+            resize = iaa.Resize(
+                size={"height": 512, "width": width_resize}, interpolation="nearest"
+            )
             iso_kps_img = KeypointsOnImage(
                 [Keypoint(x=iso[2], y=iso[0]) for iso in iso_pix],
                 shape=mask2d.shape,
@@ -286,9 +290,10 @@ class Processing:
     def get_jaws_Y_pix(self) -> np.ndarray:
         return self.jaws_Y_pix
 
-    def trasform(self):
+    def transform(self):
         """
-        Sequence transformation composed of resize, 90 degrees CCW rotation, and scaling of masks and keypoints (isocenters and jaw apertures).
+        Sequence transformation composed of resize, 90 degrees CCW rotation,
+        and scaling of masks and keypoints (isocenters and jaw apertures).
 
         Raises:
             AssertionError: If any of the masks does not have a height of 512 pixels.
@@ -297,7 +302,8 @@ class Processing:
             self: The modified object with rotated masks and isocenters.
 
         Notes:
-            This function expects as input masks where height and width correspond to x-axis and z-axis in the patient's coord system ("horizontal" image).
+            This function expects as input masks where height and width correspond to x-axis and z-axis
+            in the patient's coord system ("horizontal" image).
         """
         assert np.all(
             [mask.shape[0] == 512 for mask in self.masks]
@@ -319,7 +325,10 @@ class Processing:
         ):
             aug = iaa.Sequential(
                 [
-                    iaa.Resize(size={"height": 512, "width": width_resize}),
+                    iaa.Resize(
+                        size={"height": 512, "width": width_resize},
+                        interpolation="nearest",
+                    ),
                     iaa.Rot90(k=-1, keep_size=False),
                 ]
             )
@@ -345,9 +354,10 @@ class Processing:
 
         return self
 
-    def inverse_trasform(self):
+    def inverse_transform(self):
         """
-        Sequence transformation composed of scaling, 90 degrees CW rotation, and resize to recover the original values of masks and keypoints (isocenters and jaw apertures).
+        Sequence transformation composed of scaling, 90 degrees CW rotation, and resize
+        to recover the original values of masks and keypoints (isocenters and jaw apertures).
 
         Raises:
             AssertionError: If any of the masks does not have a height of 512 pixels.
@@ -356,7 +366,8 @@ class Processing:
             self: The modified object with rotated masks and isocenters.
 
         Notes:
-            This function expects as input masks where height and width correspond to z-axis and x-axis in the patient's coord system ("vertical" image).
+            This function expects as input masks where height and width correspond to z-axis and x-axis
+            in the patient's coord system ("vertical" image).
         """
         assert np.all(
             [mask.shape[0] == 512 for mask in self.masks]
@@ -377,7 +388,10 @@ class Processing:
             aug = iaa.Sequential(
                 [
                     iaa.Rot90(k=1, keep_size=False),
-                    iaa.Resize(size={"height": 512, "width": width_resize}),
+                    iaa.Resize(
+                        size={"height": 512, "width": width_resize},
+                        interpolation="nearest",
+                    ),
                 ]
             )
             # Swap columns to original dicom coordinate system
@@ -416,6 +430,24 @@ class Processing:
         width_resize: int,
         aug: iaa.Sequential,
     ):
+        """
+        Apply transformations to a 2D mask and associated keypoints.
+
+        Parameters:
+        - masks_aug (list[np.ndarray]): List to store augmented 2D masks.
+        - isos_kps_img_aug3D (np.ndarray): Array to store augmented 3D keypoints.
+        - jaws_Y_pix_aug (np.ndarray): Array to store augmented Y apertures.
+        - i (int): Index indicating the current transformed mask.
+        - mask2d (np.ndarray): 2D mask to be augmented.
+        - iso_pix (np.ndarray): 2D array containing the original isocenter keypoints.
+        - jaw_Y_pix (np.ndarray): 1D array containing original Y apertures.
+        - width_resize (int): Width to which Y apertures should be resized.
+        - aug (imgaug.augmenters.Sequential): Transformation sequence applied to the mask.
+
+        Note:
+        - Transformations are applied to the 2D mask and its associated keypoints (isos_kps_img).
+        """
+
         iso_kps_img = KeypointsOnImage(
             [Keypoint(x=iso[2], y=iso[0]) for iso in iso_pix],
             shape=mask2d.shape,
@@ -447,9 +479,7 @@ class Processing:
         if not os.path.exists(r"data\interim"):
             os.makedirs(r"data\interim")
 
-        np.savez(
-            r"data\interim\masks2D.npz", *self.masks
-        )  # unpack the list to pass the mask2D arrays as positional arguments
+        np.save(r"data\interim\masks2D.npy", np.array(self.masks))
         np.save(r"data\interim\isocenters_pix.npy", self.isocenters_pix)
         np.save(r"data\interim\jaws_X_pix.npy", self.jaws_X_pix)
         np.save(r"data\interim\jaws_Y_pix.npy", self.jaws_Y_pix)
@@ -493,6 +523,7 @@ def load_masks() -> list[np.ndarray]:
         "lungs_masks": r"data\raw\lungs_masks2D.npz",
         "liver_masks": r"data\raw\liver_masks2D.npz",
         "bladder_masks": r"data\raw\bladder_masks2D.npz",
+        "intestine_masks": r"data\raw\intestine_masks2D.npz",
     }
 
     loaded_masks = {}
@@ -508,6 +539,7 @@ def load_masks() -> list[np.ndarray]:
         bladder_mask,
         lungs_mask,
         liver_mask,
+        intestine_mask,
     ) in zip(
         loaded_masks["ptv_imgs"],
         loaded_masks["ptv_masks"],
@@ -515,14 +547,17 @@ def load_masks() -> list[np.ndarray]:
         loaded_masks["bladder_masks"],
         loaded_masks["lungs_masks"],
         loaded_masks["liver_masks"],
+        loaded_masks["intestine_masks"],
     ):
         channel1 = ptv_img[:, :, np.newaxis]
-        channel2 = ptv_mask[:, :, np.newaxis]
-        channel3 = 3 * brain_mask[:, :, np.newaxis]
-        channel4 = 4 * bladder_mask[:, :, np.newaxis]
-        channel5 = 5 * lungs_mask[:, :, np.newaxis]
-        channel6 = 6 * liver_mask[:, :, np.newaxis]
-        channel_overlap = channel3 + channel4 + channel5 + channel6
+        channel2 = 0.3 * ptv_mask[:, :, np.newaxis]
+        channel3 = 0.5 * brain_mask[:, :, np.newaxis]
+        channel4 = 0.5 * bladder_mask[:, :, np.newaxis]
+        channel5 = 0.5 * lungs_mask[:, :, np.newaxis]
+        channel6 = 0.5 * liver_mask[:, :, np.newaxis]
+        channel7 = intestine_mask[:, :, np.newaxis]
+        channel_overlap = channel3 + channel4 + channel5 + channel6 + channel7
+
         image = np.concatenate(
             (
                 channel1,
@@ -551,4 +586,4 @@ if __name__ == "__main__":
         coll_angles,
     )
 
-    processing.trasform().save_data()
+    processing.transform().save_data()

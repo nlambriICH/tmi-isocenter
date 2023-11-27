@@ -1,6 +1,5 @@
 """Lightning module for CNN training"""
 import torch
-from torch import nn
 import torch.nn.functional as F
 from src.modules.lightning_cnn import LitCNN
 
@@ -13,11 +12,10 @@ class BodyCNN(LitCNN):  # pylint: disable=too-many-ancestors
         learning_rate=1e-5,
         mse_loss_weight=5.0,
         bcelogits_loss_weight=0.00000001,
-        weight=2,
-        activation=nn.ReLU(),
-        focus_on=[1, 2],
+        weight=3,
+        focus_on=[1],
         filters=4,
-        output=26,
+        output=25,
     ):
         """Initialize the LitCNN module
 
@@ -30,7 +28,6 @@ class BodyCNN(LitCNN):  # pylint: disable=too-many-ancestors
             mse_loss_weight=mse_loss_weight,
             bcelogits_loss_weight=bcelogits_loss_weight,
             weight=weight,
-            activation=activation,
             focus_on=focus_on,
             filters=filters,
             output=output,

@@ -11,7 +11,6 @@ class CNN(nn.Module):
         filters: int,
         output: int,
         classif: bool = True,
-        activation=nn.ReLU(),
     ):
         super().__init__()
         self.classif = classif
@@ -21,25 +20,25 @@ class CNN(nn.Module):
                 filters,
                 8,
             ),
-            activation,
+            nn.ReLU(),
             nn.Conv2d(
                 filters,
                 filters * 2,
                 8,
             ),
-            activation,
+            nn.ReLU(),
             nn.Conv2d(
                 filters * 2,
                 filters * 4,
                 8,
             ),
-            activation,
+            nn.ReLU(),
             nn.Conv2d(
                 filters * 4,
                 filters * 8,
                 8,
             ),
-            activation,
+            nn.ReLU(),
             nn.MaxPool2d(2),
         )
 

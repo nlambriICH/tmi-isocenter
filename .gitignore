@@ -3,6 +3,7 @@
 /data/
 /lightning_logs/
 /src/config/constants.json
+/models/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
