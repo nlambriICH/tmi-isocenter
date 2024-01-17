@@ -122,7 +122,6 @@ tensorboard==2.13.0
 tensorboard-data-server==0.7.0
 threadpoolctl==3.1.0
 tifffile==2023.4.12
--e git+https://github.com/nlambriICH/tmi-isocenter.git@178520d7967e80e5e8145d035a154b366c88f002#egg=tmi_isocenter
 torch==2.0.1
 torch-tb-profiler==0.4.1
 torchmetrics==0.11.1
