@@ -13,7 +13,7 @@ class CNN(nn.Module):
         classif: bool = True,
     ):
         super().__init__()
-        self.classif = classif
+
         self.simple_cnn = nn.Sequential(
             nn.Conv2d(
                 3,
@@ -46,11 +46,6 @@ class CNN(nn.Module):
             nn.Flatten(),
             nn.Linear(filters * 8 * 242 * 242, output),
         )
-        if not self.classif:
-            self.classification_head = nn.Sequential(
-                nn.Flatten(),
-                nn.Linear(filters * 8 * 242 * 242, 1),
-            )
 
     def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """Forward pass of the network
@@ -63,7 +58,5 @@ class CNN(nn.Module):
                 and classification heads
         """
         x = self.simple_cnn(x)
-        if self.classif:
-            return self.regression_head(x)
-        else:
-            return self.regression_head(x), self.classification_head(x)
+
+        return self.regression_head(x)

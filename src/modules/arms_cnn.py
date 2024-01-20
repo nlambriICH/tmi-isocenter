@@ -9,7 +9,6 @@ class ArmCNN(LitCNN):  # pylint: disable=too-many-ancestors
         self,
         learning_rate=1e-5,
         mse_loss_weight=5.0,
-        bcelogits_loss_weight=0.0000001,
         weight=3,
         focus_on=[0, 1],
         filters=4,
@@ -24,7 +23,6 @@ class ArmCNN(LitCNN):  # pylint: disable=too-many-ancestors
         super().__init__(
             learning_rate=learning_rate,
             mse_loss_weight=mse_loss_weight,
-            bcelogits_loss_weight=bcelogits_loss_weight,
             weight=weight,
             focus_on=focus_on,
             filters=filters,
