@@ -18,6 +18,7 @@ from src.config.constants import (
     MAP_ID_JUNCTION,
     DICOM_PATH,
     MAP_ID_LUNGS,
+    CLASSIFICATION,
 )
 from src.utils.field_geometry_transf import transform_field_geometry
 
@@ -599,8 +600,13 @@ if __name__ == "__main__":
         bladder_masks,
     ) = read_dicoms()
 
-    if not os.path.exists(r"data\raw"):
-        os.makedirs(r"data\raw")
+    if CLASSIFICATION:
+        path = r"data\5_355\raw"
+    else:
+        path = r"data\90\raw"
+
+    if not os.path.exists(path):
+        os.makedirs(path)
 
     pd.DataFrame(
         patient_info,
@@ -622,14 +628,14 @@ if __name__ == "__main__":
     ).to_csv(r"data\patient_info.csv")
 
     # With np.savez we unpack the list to pass the 2D arrays as positional arguments
-    np.savez(r"data\raw\ptv_masks2D.npz", *ptv_masks)
-    np.savez(r"data\raw\ptv_imgs2D.npz", *ptv_imgs)
-    np.save(r"data\raw\isocenters_pix.npy", np.array(isocenters_pix))
-    np.save(r"data\raw\jaws_X_pix.npy", np.array(jaws_X_pix))
-    np.save(r"data\raw\jaws_Y_pix.npy", np.array(jaws_Y_pix))
-    np.save(r"data\raw\angles.npy", np.array(angles))
-    np.savez(r"data\raw\brain_masks2D.npz", *brain_masks)
-    np.savez(r"data\raw\lungs_masks2D.npz", *lungs_masks)
-    np.savez(r"data\raw\liver_masks2D.npz", *liver_masks)
-    np.savez(r"data\raw\intestine_masks2D.npz", *intestine_masks)
-    np.savez(r"data\raw\bladder_masks2D.npz", *bladder_masks)
+    np.savez(path + r"\ptv_masks2D.npz", *ptv_masks)
+    np.savez(path + r"\ptv_imgs2D.npz", *ptv_imgs)
+    np.save(path + r"\isocenters_pix.npy", np.array(isocenters_pix))
+    np.save(path + r"\jaws_X_pix.npy", np.array(jaws_X_pix))
+    np.save(path + r"\jaws_Y_pix.npy", np.array(jaws_Y_pix))
+    np.save(path + r"\angles.npy", np.array(angles))
+    np.savez(path + r"\brain_masks2D.npz", *brain_masks)
+    np.savez(path + r"\lungs_masks2D.npz", *lungs_masks)
+    np.savez(path + r"\liver_masks2D.npz", *liver_masks)
+    np.savez(path + r"\intestine_masks2D.npz", *intestine_masks)
+    np.savez(path + r"\bladder_masks2D.npz", *bladder_masks)

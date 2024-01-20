@@ -6,6 +6,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from src.data.processing import Processing
+from src.data.processing import directory
 from scipy import ndimage
 from src.config.constants import MODEL
 from src.utils.local_optimization import Optimization
@@ -15,14 +16,15 @@ class Visualize:
     """Visualization class to visualize model's output"""
 
     def __init__(self, log_dic) -> None:
-        with np.load(r"data\raw\ptv_masks2D.npz") as npz_masks2d:
+        dir_path = directory() + "raw\\"
+        with np.load(dir_path + "ptv_masks2D.npz") as npz_masks2d:
             self.ptv_masks = list(npz_masks2d.values())
-        with np.load(r"data\raw\ptv_imgs2D.npz") as npz_masks2d:
+        with np.load(dir_path + "ptv_imgs2D.npz") as npz_masks2d:
             self.img_hu = list(npz_masks2d.values())
-        self.isocenters_pix = np.load(r"data\raw\isocenters_pix.npy")
-        self.jaws_X_pix = np.load(r"data\raw\jaws_X_pix.npy")
-        self.jaws_Y_pix = np.load(r"data\raw\jaws_Y_pix.npy")
-        self.coll_angles = np.load(r"data\raw\angles.npy")
+        self.isocenters_pix = np.load(dir_path + "isocenters_pix.npy")
+        self.jaws_X_pix = np.load(dir_path + "jaws_X_pix.npy")
+        self.jaws_Y_pix = np.load(dir_path + "jaws_Y_pix.npy")
+        self.coll_angles = np.load(dir_path + "angles.npy")
         self.df_patient_info = pd.read_csv(r"data\patient_info.csv")
         self.original_sizes_col_idx = self.df_patient_info.columns.get_loc(
             key="OrigMaskShape_z"
