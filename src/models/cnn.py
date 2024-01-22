@@ -55,7 +55,6 @@ class CNN(nn.Module):
 
         Returns:
             tuple[torch.Tensor, torch.Tensor]: output tensors for regression
-                and classification heads
         """
         x = self.simple_cnn(x)
 

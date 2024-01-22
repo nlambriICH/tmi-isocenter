@@ -71,14 +71,14 @@ if __name__ == "__main__":
             y_reg_train,
             y_cls_train,
         ),
-        num_workers=16,
+        num_workers=12,
         batch_size=10,
         shuffle=True,
     )
 
     val_loader = DataLoader(
         TensorDataset(masks_val, y_reg_val, y_cls_val),
-        num_workers=16,
+        num_workers=12,
     )
 
     test_len = test_index.shape[0]
@@ -91,7 +91,7 @@ if __name__ == "__main__":
             masks_train[0:test_len],  # mask_train = [0:11] or [0:3]
             train_index[0:test_len],  # mask_train = [0:11] or [0:3]
         ),
-        num_workers=16,
+        num_workers=12,
     )
 
     trainer = pl.Trainer(

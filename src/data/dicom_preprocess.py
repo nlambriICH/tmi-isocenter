@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import pydicom
 from pydicom import Dataset
+from src.utils.functions import directory
 from rt_utils import RTStructBuilder, RTStruct
 from rt_utils.image_helper import (
     get_patient_to_pixel_transformation_matrix,
@@ -18,7 +19,6 @@ from src.config.constants import (
     MAP_ID_JUNCTION,
     DICOM_PATH,
     MAP_ID_LUNGS,
-    CLASSIFICATION,
 )
 from src.utils.field_geometry_transf import transform_field_geometry
 
@@ -600,14 +600,6 @@ if __name__ == "__main__":
         bladder_masks,
     ) = read_dicoms()
 
-    if CLASSIFICATION:
-        path = r"data\5_355\raw"
-    else:
-        path = r"data\90\raw"
-
-    if not os.path.exists(path):
-        os.makedirs(path)
-
     pd.DataFrame(
         patient_info,
         columns=(
@@ -628,14 +620,14 @@ if __name__ == "__main__":
     ).to_csv(r"data\patient_info.csv")
 
     # With np.savez we unpack the list to pass the 2D arrays as positional arguments
-    np.savez(path + r"\ptv_masks2D.npz", *ptv_masks)
-    np.savez(path + r"\ptv_imgs2D.npz", *ptv_imgs)
-    np.save(path + r"\isocenters_pix.npy", np.array(isocenters_pix))
-    np.save(path + r"\jaws_X_pix.npy", np.array(jaws_X_pix))
-    np.save(path + r"\jaws_Y_pix.npy", np.array(jaws_Y_pix))
-    np.save(path + r"\angles.npy", np.array(angles))
-    np.savez(path + r"\brain_masks2D.npz", *brain_masks)
-    np.savez(path + r"\lungs_masks2D.npz", *lungs_masks)
-    np.savez(path + r"\liver_masks2D.npz", *liver_masks)
-    np.savez(path + r"\intestine_masks2D.npz", *intestine_masks)
-    np.savez(path + r"\bladder_masks2D.npz", *bladder_masks)
+    np.savez(directory(r"raw\ptv_masks2D.npz"), *ptv_masks)
+    np.savez(directory(r"raw\ptv_imgs2D.npz"), *ptv_imgs)
+    np.save(directory(r"raw\isocenters_pix.npy"), np.array(isocenters_pix))
+    np.save(directory(r"raw\jaws_X_pix.npy"), np.array(jaws_X_pix))
+    np.save(directory(r"raw\jaws_Y_pix.npy"), np.array(jaws_Y_pix))
+    np.save(directory(r"raw\angles.npy"), np.array(angles))
+    np.savez(directory(r"raw\brain_masks2D.npz"), *brain_masks)
+    np.savez(directory(r"raw\lungs_masks2D.npz"), *lungs_masks)
+    np.savez(directory(r"raw\liver_masks2D.npz"), *liver_masks)
+    np.savez(directory(r"raw\intestine_masks2D.npz"), *intestine_masks)
+    np.savez(directory(r"raw\bladder_masks2D.npz"), *bladder_masks)

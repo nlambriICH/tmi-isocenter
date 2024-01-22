@@ -1,16 +1,9 @@
 import numpy as np
 import imgaug.augmenters as iaa
 from imgaug.augmentables import Keypoint, KeypointsOnImage
+from src.utils.functions import directory
 from src.utils.field_geometry_transf import get_zero_row_idx
 import os
-from src.config.constants import CLASSIFICATION
-
-
-def directory() -> str:
-    if CLASSIFICATION:
-        return "data\\5_355\\"
-    else:
-        return "data\\90\\"
 
 
 class Processing:
@@ -484,15 +477,14 @@ class Processing:
             None.
         """
 
-        dir_path = directory() + "interim\\"
-        if not os.path.exists(dir_path):
-            os.makedirs(dir_path)
+        if not os.path.exists(directory(r"interim")):
+            os.makedirs(directory(r"interim"))
 
-        np.save(dir_path + "masks2D.npy", np.array(self.masks))
-        np.save(dir_path + "isocenters_pix.npy", self.isocenters_pix)
-        np.save(dir_path + "jaws_X_pix.npy", self.jaws_X_pix)
-        np.save(dir_path + "jaws_Y_pix.npy", self.jaws_Y_pix)
-        np.save(dir_path + "angles.npy", self.coll_angles)
+        np.save(directory(r"interim\masks2D.npy"), np.array(self.masks))
+        np.save(directory(r"interim\isocenters_pix.npy"), self.isocenters_pix)
+        np.save(directory(r"interim\jaws_X_pix.npy"), self.jaws_X_pix)
+        np.save(directory(r"interim\jaws_Y_pix.npy"), self.jaws_Y_pix)
+        np.save(directory(r"interim\angles.npy"), self.coll_angles)
 
 
 def load_masks() -> list[np.ndarray]:
@@ -525,15 +517,15 @@ def load_masks() -> list[np.ndarray]:
 
     The function returns a list of processed mask images.
     """
-    dir_path = directory() + "raw\\"
+
     raw_data = {
-        "ptv_imgs": dir_path + "ptv_imgs2D.npz",
-        "ptv_masks": dir_path + "ptv_masks2D.npz",
-        "brain_masks": dir_path + "brain_masks2D.npz",
-        "lungs_masks": dir_path + "lungs_masks2D.npz",
-        "liver_masks": dir_path + "liver_masks2D.npz",
-        "bladder_masks": dir_path + "bladder_masks2D.npz",
-        "intestine_masks": dir_path + "intestine_masks2D.npz",
+        "ptv_imgs": directory(r"raw\ptv_imgs2D.npz"),
+        "ptv_masks": directory(r"raw\ptv_masks2D.npz"),
+        "brain_masks": directory(r"raw\brain_masks2D.npz"),
+        "lungs_masks": directory(r"raw\lungs_masks2D.npz"),
+        "liver_masks": directory(r"raw\liver_masks2D.npz"),
+        "bladder_masks": directory(r"raw\bladder_masks2D.npz"),
+        "intestine_masks": directory(r"raw\intestine_masks2D.npz"),
     }
 
     loaded_masks = {}
@@ -582,12 +574,11 @@ def load_masks() -> list[np.ndarray]:
 
 
 if __name__ == "__main__":
-    dir_path = directory() + "raw\\"
     mask_imgs = load_masks()
-    isocenters_pix = np.load(dir_path + "isocenters_pix.npy")
-    jaws_X_pix = np.load(dir_path + "jaws_X_pix.npy")
-    jaws_Y_pix = np.load(dir_path + "jaws_Y_pix.npy")
-    coll_angles = np.load(dir_path + "angles.npy")
+    isocenters_pix = np.load(directory(r"raw\isocenters_pix.npy"))
+    jaws_X_pix = np.load(directory(r"raw\jaws_X_pix.npy"))
+    jaws_Y_pix = np.load(directory(r"raw\jaws_Y_pix.npy"))
+    coll_angles = np.load(directory(r"raw\angles.npy"))
 
     processing = Processing(
         mask_imgs,
