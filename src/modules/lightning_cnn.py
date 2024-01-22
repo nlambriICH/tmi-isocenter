@@ -7,7 +7,7 @@ from torch.optim import Adam
 from torchmetrics.classification import BinaryAccuracy
 from src.models.cnn import CNN
 from src.utils.visualization_cnn import Visualize
-from src.config.constants import CLASSIFICATION
+from src.config.constants import COLL_5_355
 
 
 class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
@@ -33,7 +33,7 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
         self.example_input_array = torch.Tensor(
             1, 3, 512, 512
         )  # display the intermediate input and output sizes of layers when trainer.fit() is called
-        self.classif = CLASSIFICATION
+        self.classif = COLL_5_355
         self.cnn = CNN(
             filters,
             output,
@@ -143,13 +143,18 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
         y_cls = y_cls.view(1, -1)  # shape=(1, N_out)
 
         y_reg_hat = self.cnn(x)
-        y_cls_hat = torch.zeros(1)
+
         test_mse_loss = self.weighted_mse_loss(y_reg_hat, y_reg)
         metrics = {
             "test_mse_loss": test_mse_loss,
         }
         y_train_reg_hat = self.cnn(x_train)
-        y_train_cls_hat = torch.zeros(1)
+        if COLL_5_355:
+            y_train_cls_hat = torch.ones(1)
+            y_cls_hat = torch.ones(1)
+        else:
+            y_train_cls_hat = torch.zeros(1)
+            y_cls_hat = torch.zeros(1)
 
         self.log_dict(metrics)
 

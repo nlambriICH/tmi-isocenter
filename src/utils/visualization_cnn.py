@@ -21,8 +21,8 @@ class Visualize:
         with np.load(directory(r"raw\ptv_imgs2D.npz")) as npz_masks2d:
             self.img_hu = list(npz_masks2d.values())
         self.isocenters_pix = np.load(directory(r"raw\isocenters_pix.npy"))
-        self.jaws_X_pix = np.load(directory(r"raw\"jaws_X_pix.npy"))
-        self.jaws_Y_pix = np.load(directory(r"raw\"jaws_Y_pix.npy"))
+        self.jaws_X_pix = np.load(directory(r"raw\jaws_X_pix.npy"))
+        self.jaws_Y_pix = np.load(directory(r"raw\jaws_Y_pix.npy"))
         self.coll_angles = np.load(directory(r"raw\angles.npy"))
         self.df_patient_info = pd.read_csv(r"data\patient_info.csv")
         self.original_sizes_col_idx = self.df_patient_info.columns.get_loc(
@@ -499,7 +499,7 @@ class Visualize:
         jaws_Y_pix_hat = jaws_Y_pix_hat[np.newaxis]
 
         angles = 90 * np.ones(12)
-        if round(torch.sigmoid(coll_angle_hat).item()) == 1:
+        if coll_angle_hat.item() == 1:
             angles[0] = 355
             angles[1] = 5
 
