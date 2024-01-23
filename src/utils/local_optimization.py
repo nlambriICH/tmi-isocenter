@@ -1,10 +1,13 @@
+from dataclasses import dataclass, field
+from os.path import dirname, join
+
 import numpy as np
 import pandas as pd
-from src.data.processing import Processing
-from dataclasses import dataclass, field
+from gradient_free_optimizers import GridSearchOptimizer, ParallelTemperingOptimizer
 from scipy import ndimage
-from gradient_free_optimizers import ParallelTemperingOptimizer, GridSearchOptimizer
-from src.config.constants import MODEL
+
+from src.config.constants import MODEL, RAW_DATA_DIR_PATH
+from src.data.processing import Processing
 
 
 @dataclass
@@ -47,10 +50,11 @@ class Optimization:
         self,
         patient_idx: int,
         processing_output: Processing,
-        img: np.ndarray,
         aspect_ratio: float,
     ) -> None:
-        self.df_patient_info = pd.read_csv(r"data\patient_info.csv")
+        self.df_patient_info = pd.read_csv(
+            join(dirname(RAW_DATA_DIR_PATH), "patient_info.csv")
+        )
         self.patient_idx = patient_idx
         self.original_sizes_col_idx = self.df_patient_info.columns.get_loc(
             key="OrigMaskShape_z"

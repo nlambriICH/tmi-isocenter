@@ -1,13 +1,14 @@
 """Lightning module for CNN training"""
+import lightning.pytorch as pl
 import torch
 import torch.nn.functional as F
-import lightning.pytorch as pl
-from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.optim import Adam
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torchmetrics.classification import BinaryAccuracy
+
+from src.config.constants import COLL_5_355
 from src.models.cnn import CNN
 from src.utils.visualization_cnn import Visualize
-from src.config.constants import COLL_5_355
 
 
 class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
@@ -33,11 +34,9 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
         self.example_input_array = torch.Tensor(
             1, 3, 512, 512
         )  # display the intermediate input and output sizes of layers when trainer.fit() is called
-        self.classif = COLL_5_355
         self.cnn = CNN(
             filters,
             output,
-            self.classif,
         )
 
         self.learning_rate = learning_rate
@@ -149,12 +148,6 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
             "test_mse_loss": test_mse_loss,
         }
         y_train_reg_hat = self.cnn(x_train)
-        if COLL_5_355:
-            y_train_cls_hat = torch.ones(1)
-            y_cls_hat = torch.ones(1)
-        else:
-            y_train_cls_hat = torch.zeros(1)
-            y_cls_hat = torch.zeros(1)
 
         self.log_dict(metrics)
 
@@ -169,7 +162,6 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
             patient_idx=int(train_index.item()),
             output=y_train_reg_hat[0],
             path=self.logger.log_dir,  # pyright: ignore[reportGeneralTypeIssues,reportOptionalMemberAccess]
-            coll_angle_hat=y_train_cls_hat,
             single_fig=True,
         )
         viz.plot_img(
@@ -177,7 +169,6 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
             patient_idx=int(test_idx.item()),
             output=y_reg_hat[0],
             path=self.logger.log_dir,  # pyright: ignore[reportGeneralTypeIssues,reportOptionalMemberAccess]
-            coll_angle_hat=y_cls_hat,
             mse=test_mse_loss,
         )
 

@@ -1,8 +1,11 @@
 """Dataset utility functions"""
+from os.path import dirname, join
+
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
-from src.utils.functions import directory
+
+from src.config.constants import INTERIM_DATA_DIR_PATH
 from src.data.augmentation import Augmentation
 
 
@@ -11,24 +14,28 @@ class Dataset:
 
     def __init__(self) -> None:
         self.masks2d = np.transpose(
-            np.load(directory(r"interim\masks2D.npy")), (0, 3, 1, 2)
+            np.load(join(INTERIM_DATA_DIR_PATH, "masks2D.npy")), (0, 3, 1, 2)
         )
         self.normalize_ptv_hu()
         self.num_patients = self.masks2d.shape[0]
 
         self.isocenters_pix = np.load(
-            directory(r"interim\isocenters_pix.npy")
+            join(INTERIM_DATA_DIR_PATH, "isocenters_pix.npy")
         )  # shape=(N, 12, 3)
 
         self.jaws_X_pix = np.load(
-            directory(r"interim\jaws_X_pix.npy")
+            join(INTERIM_DATA_DIR_PATH, "jaws_X_pix.npy")
         )  # shape=(N, 12, 2)
         self.jaws_Y_pix = np.load(
-            directory(r"interim\jaws_Y_pix.npy")
+            join(INTERIM_DATA_DIR_PATH, "jaws_Y_pix.npy")
         )  # shape=(N, 12, 2)
-        self.angles = np.load(directory(r"interim\angles.npy"))  # shape=(N, 12)
+        self.angles = np.load(
+            join(INTERIM_DATA_DIR_PATH, "angles.npy")
+        )  # shape=(N, 12)
         self.angle_class = np.where(self.angles[:, 0] == 90, 0.0, 1.0)  # shape=(N,)
-        self.df_patient_info_original = pd.read_csv(r"data\patient_info.csv")
+        self.df_patient_info_original = pd.read_csv(
+            join(dirname(INTERIM_DATA_DIR_PATH), "patient_info.csv")
+        )
         self.df_patient_info = self.df_patient_info_original
 
     def normalize_ptv_hu(self, background=0) -> None:

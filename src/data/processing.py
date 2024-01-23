@@ -1,9 +1,12 @@
-import numpy as np
-import imgaug.augmenters as iaa
-from imgaug.augmentables import Keypoint, KeypointsOnImage
-from src.utils.functions import directory
-from src.utils.field_geometry_transf import get_zero_row_idx
 import os
+from os.path import exists, join
+
+import imgaug.augmenters as iaa
+import numpy as np
+from imgaug.augmentables import Keypoint, KeypointsOnImage
+
+from src.config.constants import INTERIM_DATA_DIR_PATH, RAW_DATA_DIR_PATH
+from src.utils.field_geometry_transf import get_zero_row_idx
 
 
 class Processing:
@@ -477,14 +480,14 @@ class Processing:
             None.
         """
 
-        if not os.path.exists(directory(r"interim")):
-            os.makedirs(directory(r"interim"))
+        if not exists(INTERIM_DATA_DIR_PATH):
+            os.makedirs(INTERIM_DATA_DIR_PATH)
 
-        np.save(directory(r"interim\masks2D.npy"), np.array(self.masks))
-        np.save(directory(r"interim\isocenters_pix.npy"), self.isocenters_pix)
-        np.save(directory(r"interim\jaws_X_pix.npy"), self.jaws_X_pix)
-        np.save(directory(r"interim\jaws_Y_pix.npy"), self.jaws_Y_pix)
-        np.save(directory(r"interim\angles.npy"), self.coll_angles)
+        np.save(join(INTERIM_DATA_DIR_PATH, "masks2D.npy"), np.array(self.masks))
+        np.save(join(INTERIM_DATA_DIR_PATH, "isocenters_pix.npy"), self.isocenters_pix)
+        np.save(join(INTERIM_DATA_DIR_PATH, "jaws_X_pix.npy"), self.jaws_X_pix)
+        np.save(join(INTERIM_DATA_DIR_PATH, "jaws_Y_pix.npy"), self.jaws_Y_pix)
+        np.save(join(INTERIM_DATA_DIR_PATH, "angles.npy"), self.coll_angles)
 
 
 def load_masks() -> list[np.ndarray]:
@@ -519,13 +522,13 @@ def load_masks() -> list[np.ndarray]:
     """
 
     raw_data = {
-        "ptv_imgs": directory(r"raw\ptv_imgs2D.npz"),
-        "ptv_masks": directory(r"raw\ptv_masks2D.npz"),
-        "brain_masks": directory(r"raw\brain_masks2D.npz"),
-        "lungs_masks": directory(r"raw\lungs_masks2D.npz"),
-        "liver_masks": directory(r"raw\liver_masks2D.npz"),
-        "bladder_masks": directory(r"raw\bladder_masks2D.npz"),
-        "intestine_masks": directory(r"raw\intestine_masks2D.npz"),
+        "ptv_imgs": join(RAW_DATA_DIR_PATH, "ptv_imgs2D.npz"),
+        "ptv_masks": join(RAW_DATA_DIR_PATH, "ptv_masks2D.npz"),
+        "brain_masks": join(RAW_DATA_DIR_PATH, "brain_masks2D.npz"),
+        "lungs_masks": join(RAW_DATA_DIR_PATH, "lungs_masks2D.npz"),
+        "liver_masks": join(RAW_DATA_DIR_PATH, "liver_masks2D.npz"),
+        "bladder_masks": join(RAW_DATA_DIR_PATH, "bladder_masks2D.npz"),
+        "intestine_masks": join(RAW_DATA_DIR_PATH, "intestine_masks2D.npz"),
     }
 
     loaded_masks = {}
@@ -575,10 +578,10 @@ def load_masks() -> list[np.ndarray]:
 
 if __name__ == "__main__":
     mask_imgs = load_masks()
-    isocenters_pix = np.load(directory(r"raw\isocenters_pix.npy"))
-    jaws_X_pix = np.load(directory(r"raw\jaws_X_pix.npy"))
-    jaws_Y_pix = np.load(directory(r"raw\jaws_Y_pix.npy"))
-    coll_angles = np.load(directory(r"raw\angles.npy"))
+    isocenters_pix = np.load(join(RAW_DATA_DIR_PATH, "isocenters_pix.npy"))
+    jaws_X_pix = np.load(join(RAW_DATA_DIR_PATH, "jaws_X_pix.npy"))
+    jaws_Y_pix = np.load(join(RAW_DATA_DIR_PATH, "jaws_Y_pix.npy"))
+    coll_angles = np.load(join(RAW_DATA_DIR_PATH, "angles.npy"))
 
     processing = Processing(
         mask_imgs,

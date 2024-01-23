@@ -1,14 +1,16 @@
 import os
+from os.path import dirname, exists, join
 from typing import Literal
-import torch
+
+import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
-from src.data.processing import Processing
-from src.utils.functions import directory
+import torch
 from scipy import ndimage
-from src.config.constants import MODEL
+
+from src.config.constants import COLL_5_355, MODEL, RAW_DATA_DIR_PATH
+from src.data.processing import Processing
 from src.utils.local_optimization import Optimization
 
 
@@ -16,15 +18,17 @@ class Visualize:
     """Visualization class to visualize model's output"""
 
     def __init__(self, log_dic) -> None:
-        with np.load(directory(r"raw\ptv_masks2D.npz")) as npz_masks2d:
+        with np.load(join(RAW_DATA_DIR_PATH, "ptv_masks2D.npz")) as npz_masks2d:
             self.ptv_masks = list(npz_masks2d.values())
-        with np.load(directory(r"raw\ptv_imgs2D.npz")) as npz_masks2d:
+        with np.load(join(RAW_DATA_DIR_PATH, "ptv_imgs2D.npz")) as npz_masks2d:
             self.img_hu = list(npz_masks2d.values())
-        self.isocenters_pix = np.load(directory(r"raw\isocenters_pix.npy"))
-        self.jaws_X_pix = np.load(directory(r"raw\jaws_X_pix.npy"))
-        self.jaws_Y_pix = np.load(directory(r"raw\jaws_Y_pix.npy"))
-        self.coll_angles = np.load(directory(r"raw\angles.npy"))
-        self.df_patient_info = pd.read_csv(r"data\patient_info.csv")
+        self.isocenters_pix = np.load(join(RAW_DATA_DIR_PATH, "isocenters_pix.npy"))
+        self.jaws_X_pix = np.load(join(RAW_DATA_DIR_PATH, "jaws_X_pix.npy"))
+        self.jaws_Y_pix = np.load(join(RAW_DATA_DIR_PATH, "jaws_Y_pix.npy"))
+        self.coll_angles = np.load(join(RAW_DATA_DIR_PATH, "angles.npy"))
+        self.df_patient_info = pd.read_csv(
+            join(dirname(RAW_DATA_DIR_PATH), "patient_info.csv")
+        )
         self.original_sizes_col_idx = self.df_patient_info.columns.get_loc(
             key="OrigMaskShape_z"
         )
@@ -441,7 +445,6 @@ class Visualize:
         patient_idx: int,
         output: torch.Tensor,
         path: str,
-        coll_angle_hat: torch.Tensor = torch.ones(1),
         mse: torch.Tensor = torch.tensor(0),
         single_fig: bool = False,
     ) -> None:
@@ -457,8 +460,6 @@ class Visualize:
                 A 1D NumPy array containing the output of the model.
             path : str
                 The path where the plot image will be saved.
-            coll_angle_hat : torch.Tensor
-                The predicted collimator angle for the pelvic fields. Defaults to 1 (90 deg).
             mse : torch.Tensor
                 MSE loss added in the figure title of separate plots. Defaults to 0.
             single_fig : bool
@@ -499,7 +500,7 @@ class Visualize:
         jaws_Y_pix_hat = jaws_Y_pix_hat[np.newaxis]
 
         angles = 90 * np.ones(12)
-        if coll_angle_hat.item() == 1:
+        if COLL_5_355:
             angles[0] = 355
             angles[1] = 5
 
@@ -522,7 +523,6 @@ class Visualize:
         local_optimization = Optimization(
             patient_idx=patient_idx,
             processing_output=processing_output,
-            img=input_img,
             aspect_ratio=aspect_ratio,
         )
         local_optimization.optimize()
@@ -613,11 +613,11 @@ class Visualize:
         blue_patch = mpatches.Patch(color="blue", label="Real")
         plt.legend(handles=[red_patch, blue_patch], loc=0, frameon=True)
 
-        eval_img_path = os.path.join(path, "img", "train")
-        if not os.path.exists(eval_img_path):
+        eval_img_path = join(path, "img", "train")
+        if not exists(eval_img_path):
             os.makedirs(eval_img_path)
 
-        plt.savefig(os.path.join(eval_img_path, f"train_{patient_idx}"))
+        plt.savefig(join(eval_img_path, f"train_{patient_idx}"))
         plt.close()
 
     def separate_plots(
@@ -668,11 +668,11 @@ class Visualize:
             single_fig=True,
         )
         plt.title(f"MSE loss: {mse:.6f}")
-        predict_img_path = os.path.join(path, "img", "test", "predicted")
-        if not os.path.exists(predict_img_path):
+        predict_img_path = join(path, "img", "test", "predicted")
+        if not exists(predict_img_path):
             os.makedirs(predict_img_path)
 
-        plt.savefig(os.path.join(predict_img_path, f"test_{patient_idx}"))
+        plt.savefig(join(predict_img_path, f"test_{patient_idx}"))
         plt.close()
 
         # Plot ground truth
@@ -695,9 +695,9 @@ class Visualize:
             single_fig=True,
         )
 
-        real_img_path = os.path.join(path, "img", "test", "ground_truth")
-        if not os.path.exists(real_img_path):
+        real_img_path = join(path, "img", "test", "ground_truth")
+        if not exists(real_img_path):
             os.makedirs(real_img_path)
 
-        plt.savefig(os.path.join(real_img_path, f"test_{patient_idx}"))
+        plt.savefig(join(real_img_path, f"test_{patient_idx}"))
         plt.close()

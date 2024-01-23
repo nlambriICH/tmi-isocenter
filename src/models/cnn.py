@@ -1,6 +1,6 @@
 """Convolutional neural network module"""
-from torch import nn
 import torch
+from torch import nn
 
 
 class CNN(nn.Module):
@@ -10,7 +10,6 @@ class CNN(nn.Module):
         self,
         filters: int,
         output: int,
-        classif: bool = True,
     ):
         super().__init__()
 
@@ -54,7 +53,7 @@ class CNN(nn.Module):
             x (torch.Tensor): input tensor
 
         Returns:
-            tuple[torch.Tensor, torch.Tensor]: output tensors for regression
+            tuple[torch.Tensor, torch.Tensor]: output tensor for regression.
         """
         x = self.simple_cnn(x)
 

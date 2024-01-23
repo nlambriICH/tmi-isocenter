@@ -1,24 +1,27 @@
-import os
 import glob
+import os
 import warnings
+from os.path import dirname, exists, join
+
 import numpy as np
 import pandas as pd
 import pydicom
 from pydicom import Dataset
-from src.utils.functions import directory
-from rt_utils import RTStructBuilder, RTStruct
+from rt_utils import RTStruct, RTStructBuilder
 from rt_utils.image_helper import (
-    get_patient_to_pixel_transformation_matrix,
     apply_transformation_to_3d_points,
+    get_patient_to_pixel_transformation_matrix,
     get_slice_directions,
     get_spacing_between_slices,
 )
+
 from src.config.constants import (
-    PTV_EXCLUDE_SUBSTRINGS,
-    MAP_ID_PTV,
-    MAP_ID_JUNCTION,
     DICOM_PATH,
+    MAP_ID_JUNCTION,
     MAP_ID_LUNGS,
+    MAP_ID_PTV,
+    PTV_EXCLUDE_SUBSTRINGS,
+    RAW_DATA_DIR_PATH,
 )
 from src.utils.field_geometry_transf import transform_field_geometry
 
@@ -441,8 +444,8 @@ def read_dicoms() -> (
     _, patient_dirname, _ = next(os.walk(DICOM_PATH))
     for i, patient_id in enumerate(patient_dirname):
         print(f"Processing patient {i + 1}: {patient_id}")
-        dicom_series_path = os.path.join(DICOM_PATH, patient_id)
-        rt_struct_path = glob.glob(os.path.join(dicom_series_path, "RTSTRUCT*"))[0]
+        dicom_series_path = join(DICOM_PATH, patient_id)
+        rt_struct_path = glob.glob(join(dicom_series_path, "RTSTRUCT*"))[0]
 
         # Load existing RT Struct. Requires the series path and existing RT Struct path
         rtstruct = RTStructBuilder.create_from(
@@ -468,7 +471,7 @@ def read_dicoms() -> (
             rtstruct, ptv_name, junction_names
         )  # axis0=y, axis1=x, axis2=z
 
-        rt_plan_path = glob.glob(os.path.join(dicom_series_path, "RTPLAN*"))[0]
+        rt_plan_path = glob.glob(join(dicom_series_path, "RTPLAN*"))[0]
         ds = pydicom.read_file(rt_plan_path)
 
         iso, jaw_X, jaw_Y, coll_angles = get_dicom_field_geometry(
@@ -600,6 +603,9 @@ if __name__ == "__main__":
         bladder_masks,
     ) = read_dicoms()
 
+    if not exists(RAW_DATA_DIR_PATH):
+        os.makedirs(RAW_DATA_DIR_PATH)
+
     pd.DataFrame(
         patient_info,
         columns=(
@@ -617,17 +623,17 @@ if __name__ == "__main__":
             "SliceThickness",
             "PixelSpacing",
         ),
-    ).to_csv(r"data\patient_info.csv")
+    ).to_csv(join(dirname(RAW_DATA_DIR_PATH), "patient_info.csv"))
 
     # With np.savez we unpack the list to pass the 2D arrays as positional arguments
-    np.savez(directory(r"raw\ptv_masks2D.npz"), *ptv_masks)
-    np.savez(directory(r"raw\ptv_imgs2D.npz"), *ptv_imgs)
-    np.save(directory(r"raw\isocenters_pix.npy"), np.array(isocenters_pix))
-    np.save(directory(r"raw\jaws_X_pix.npy"), np.array(jaws_X_pix))
-    np.save(directory(r"raw\jaws_Y_pix.npy"), np.array(jaws_Y_pix))
-    np.save(directory(r"raw\angles.npy"), np.array(angles))
-    np.savez(directory(r"raw\brain_masks2D.npz"), *brain_masks)
-    np.savez(directory(r"raw\lungs_masks2D.npz"), *lungs_masks)
-    np.savez(directory(r"raw\liver_masks2D.npz"), *liver_masks)
-    np.savez(directory(r"raw\intestine_masks2D.npz"), *intestine_masks)
-    np.savez(directory(r"raw\bladder_masks2D.npz"), *bladder_masks)
+    np.savez(join(RAW_DATA_DIR_PATH, "ptv_masks2D.npz"), *ptv_masks)
+    np.savez(join(RAW_DATA_DIR_PATH, "ptv_imgs2D.npz"), *ptv_imgs)
+    np.save(join(RAW_DATA_DIR_PATH, "isocenters_pix.npy"), np.array(isocenters_pix))
+    np.save(join(RAW_DATA_DIR_PATH, "jaws_X_pix.npy"), np.array(jaws_X_pix))
+    np.save(join(RAW_DATA_DIR_PATH, "jaws_Y_pix.npy"), np.array(jaws_Y_pix))
+    np.save(join(RAW_DATA_DIR_PATH, "angles.npy"), np.array(angles))
+    np.savez(join(RAW_DATA_DIR_PATH, "brain_masks2D.npz"), *brain_masks)
+    np.savez(join(RAW_DATA_DIR_PATH, "lungs_masks2D.npz"), *lungs_masks)
+    np.savez(join(RAW_DATA_DIR_PATH, "liver_masks2D.npz"), *liver_masks)
+    np.savez(join(RAW_DATA_DIR_PATH, "intestine_masks2D.npz"), *intestine_masks)
+    np.savez(join(RAW_DATA_DIR_PATH, "bladder_masks2D.npz"), *bladder_masks)
