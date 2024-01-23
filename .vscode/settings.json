@@ -61,6 +61,7 @@
         "rtstruct",
         "savez",
         "torchmetrics",
+        "tqdm",
         "vect",
         "vescica",
         "voxels"

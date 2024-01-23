@@ -14,6 +14,7 @@ from rt_utils.image_helper import (
     get_slice_directions,
     get_spacing_between_slices,
 )
+from tqdm import tqdm
 
 from src.config.constants import (
     DICOM_PATH,
@@ -154,7 +155,7 @@ def get_oars_masks_3d(
         brain_name = next(filter(filter_brain_name, roi_name_list), "")
         mask_3d_brain = rtstruct.get_roi_mask_by_name(brain_name)
     except AttributeError:
-        print("No contours for brain ROI. Assign to mask of zeros")
+        tqdm.write("No contours for brain ROI. Assign to mask of zeros")
         mask_3d_brain = np.zeros_like(array_like)
 
     try:
@@ -167,28 +168,28 @@ def get_oars_masks_3d(
             lungs_names[0]
         ) | rtstruct.get_roi_mask_by_name(lungs_names[1])
     except AttributeError:
-        print("No contours for lungs ROIs. Assign to mask of zeros")
+        tqdm.write("No contours for lungs ROIs. Assign to mask of zeros")
         mask_3d_lungs = np.zeros_like(array_like)
 
     try:
         liver_name = next(filter(filter_liver_name, roi_name_list), "")
         mask_3d_liver = rtstruct.get_roi_mask_by_name(liver_name)
     except AttributeError:
-        print("No contours for liver ROI. Assign to mask of zeros")
+        tqdm.write("No contours for liver ROI. Assign to mask of zeros")
         mask_3d_liver = np.zeros_like(array_like)
 
     try:
         intestine_name = next(filter(filter_intestine_name, roi_name_list), "")
         mask_3d_intestine = rtstruct.get_roi_mask_by_name(intestine_name)
     except AttributeError:
-        print("No contours for intestine ROI. Assign to mask of zeros")
+        tqdm.write("No contours for intestine ROI. Assign to mask of zeros")
         mask_3d_intestine = np.zeros_like(array_like)
 
     try:
         bladder_name = next(filter(filter_bladder_name, roi_name_list), "")
         mask_3d_bladder = rtstruct.get_roi_mask_by_name(bladder_name)
     except AttributeError:
-        print("No contours for bladder ROI. Assign to mask of zeros")
+        tqdm.write("No contours for bladder ROI. Assign to mask of zeros")
         mask_3d_bladder = np.zeros_like(array_like)
 
     oar_names = (
@@ -442,8 +443,8 @@ def read_dicoms() -> (
     axis_direction = np.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
 
     _, patient_dirname, _ = next(os.walk(DICOM_PATH))
-    for i, patient_id in enumerate(patient_dirname):
-        print(f"Processing patient {i + 1}: {patient_id}")
+    for patient_id in (progress_bar := tqdm(patient_dirname)):
+        progress_bar.set_description(f"Processing patient {patient_id}")
         dicom_series_path = join(DICOM_PATH, patient_id)
         rt_struct_path = glob.glob(join(dicom_series_path, "RTSTRUCT*"))[0]
 
