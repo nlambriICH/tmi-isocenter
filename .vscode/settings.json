@@ -7,7 +7,7 @@
     ],
     "notebook.formatOnSave.enabled": true,
     "flake8.args": [
-        "--max-line-length=140",
+        "--max-line-length=140"
     ],
     "cSpell.words": [
         "anse",
@@ -29,6 +29,7 @@
         "encefalo",
         "facecolor",
         "fegato",
+        "figsize",
         "Fliplr",
         "frameon",
         "giun",
@@ -63,5 +64,5 @@
         "vect",
         "vescica",
         "voxels"
-    ],
+    ]
 }
