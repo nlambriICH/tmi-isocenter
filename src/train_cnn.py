@@ -6,7 +6,7 @@ from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.loggers import TensorBoardLogger
 from torch.utils.data import DataLoader, TensorDataset
 
-from src.config.constants import MODEL
+from src.config.constants import MODEL, NUM_WORKERS
 
 if __name__ == "__main__":
     if MODEL == "arms":
@@ -65,14 +65,14 @@ if __name__ == "__main__":
             masks_train,
             y_reg_train,
         ),
-        num_workers=4,
+        num_workers=NUM_WORKERS,
         batch_size=10,
         shuffle=True,
     )
 
     val_loader = DataLoader(
         TensorDataset(masks_val, y_reg_val),
-        num_workers=4,
+        num_workers=NUM_WORKERS,
     )
 
     test_len = test_index.shape[0]
@@ -84,7 +84,7 @@ if __name__ == "__main__":
             masks_train[0:test_len],  # mask_train = [0:11] or [0:3]
             train_index[0:test_len],  # mask_train = [0:11] or [0:3]
         ),
-        num_workers=4,
+        num_workers=NUM_WORKERS,
     )
 
     trainer = pl.Trainer(

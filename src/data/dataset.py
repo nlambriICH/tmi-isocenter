@@ -80,10 +80,6 @@ class Dataset:
             - 80% for training
             - 10% for validation
 
-        Args:
-            test_set (str)
-
-
         Returns:
             tuple(np.ndarray, np.ndarray): train, val, and test index splits
 

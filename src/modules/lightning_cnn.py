@@ -4,7 +4,6 @@ import torch
 import torch.nn.functional as F
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ReduceLROnPlateau
-from torchmetrics.classification import BinaryAccuracy
 
 from src.config.constants import COLL_5_355
 from src.models.cnn import CNN

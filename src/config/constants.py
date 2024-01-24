@@ -14,6 +14,7 @@ DICOM_DIR_TEST_PATH: str = data["dicom_dir_test_path"]
 MAP_ID_LUNGS: dict[str, list[str]] = data["map_lung_roi_name"]
 MODEL: str = data["model"]
 COLL_5_355: bool = data["coll_5_355"]
+NUM_WORKERS: int = data["num_workers"]  # Number of processes used by DataLoader
 
 project_dir_path = dirname(dirname(config_dir_path))
 if COLL_5_355:
