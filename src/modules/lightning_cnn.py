@@ -84,9 +84,8 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
                 name, param, global_step=self.global_step
             )
 
-        x, y_reg, y_cls = batch
+        x, y_reg = batch
         y_reg = y_reg.view(y_reg.size(0), -1)  # shape=(N_batch, N_out)
-        y_cls = y_cls.view(-1, 1)  # shape=(N_batch, 1)
 
         y_reg_hat = self.cnn(x)
         train_mse_loss = self.weighted_mse_loss(y_reg_hat, y_reg)
@@ -108,9 +107,8 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
             batch (list[torch.Tensor]): input batch
             batch_idx (int): batch index
         """
-        x, y_reg, y_cls = batch
+        x, y_reg = batch
         y_reg = y_reg.view(1, -1)  # shape=(1, N_out)
-        y_cls = y_cls.view(1, -1)  # shape=(1, 1)
 
         y_reg_hat = self.cnn(x)
         val_mse_loss = self.weighted_mse_loss(y_reg_hat, y_reg)
@@ -132,14 +130,12 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
         (
             x,
             y_reg,
-            y_cls,
             test_idx,
             x_train,
             train_index,
         ) = batch
 
         y_reg = y_reg.view(1, -1)  # shape=(1, N_out)
-        y_cls = y_cls.view(1, -1)  # shape=(1, N_out)
 
         y_reg_hat = self.cnn(x)
 

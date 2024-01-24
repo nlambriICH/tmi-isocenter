@@ -81,21 +81,18 @@ class Dataset:
             - 10% for validation
 
         Args:
-            test_set (str): The strategy to split the test data based on the  class labels (collimator angle).
+            test_set (str)
 
 
         Returns:
             tuple(np.ndarray, np.ndarray): train, val, and test index splits
 
-        Notes:
-            The dataset split is stratified by the class labels (collimator angle)
         """
 
         _, test_idx = train_test_split(
             self.df_patient_info.index,
             train_size=0.91,
             random_state=42,
-            stratify=self.angle_class[self.df_patient_info.index],
         )
         test_idx = test_idx.to_numpy()
         train_idx = self.df_patient_info.index[
@@ -107,21 +104,8 @@ class Dataset:
         train_idx, val_idx = train_test_split(
             train_idx,
             train_size=0.9,
-            stratify=self.angle_class[train_idx],
         )
 
-        imb_ratio_train = np.sum(self.angle_class[train_idx] == 0) / np.sum(
-            self.angle_class[train_idx] == 1
-        )
-        imb_ratio_val = np.sum(self.angle_class[val_idx] == 0) / np.sum(
-            self.angle_class[val_idx] == 1
-        )
-        imb_ratio_test = np.sum(self.angle_class[test_idx] == 0) / np.sum(
-            self.angle_class[test_idx] == 1
-        )
-        print(f"Imbalance ratio train set: {imb_ratio_train:.1f}")
-        print(f"Imbalance ratio val set: {imb_ratio_val:.1f}")
-        print(f"Imbalance ratio test set: {imb_ratio_test:.1f}")
         self.train_idx = train_idx
         return (train_idx, val_idx, test_idx)
 
@@ -154,15 +138,14 @@ class Dataset:
 
         return train_index
 
-    def get_data_Xy(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def get_data_Xy(self) -> tuple[np.ndarray, np.ndarray]:
         """
         Prepares and returns the input and target data for training a model.
 
         Returns:
-        tuple[np.ndarray, np.ndarray, np.ndarray]: A tuple containing:
+        tuple[np.ndarray, np.ndarray]: A tuple containing:
             - Input data (X): Array of images of shape (C, H, W).
             - Target data (y_reg): Array of unique outputs derived from isocenters and jaws positions.
-            - Additional target data (angle_class): 1D array representing the angle class for the pelvic collimator.
         """
         isocenters_pix_flat = self.isocenters_pix.reshape(self.num_patients, -1)
         jaws_X_pix_flat = self.jaws_X_pix.reshape(self.num_patients, -1)
@@ -174,7 +157,6 @@ class Dataset:
         return (
             self.masks2d,
             y_reg,
-            self.angle_class,
         )
 
     def unique_output(

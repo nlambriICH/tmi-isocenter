@@ -1,10 +1,11 @@
 """Script for model training"""
-import torch
-from torch.utils.data import TensorDataset, DataLoader
 import lightning.pytorch as pl
-from lightning.pytorch.callbacks import ModelSummary, LearningRateMonitor
+import torch
+from lightning.pytorch.callbacks import LearningRateMonitor, ModelSummary
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.loggers import TensorBoardLogger
+from torch.utils.data import DataLoader, TensorDataset
+
 from src.config.constants import MODEL
 
 if __name__ == "__main__":
@@ -32,18 +33,15 @@ if __name__ == "__main__":
 
     _, val_idx, test_index = dataset.train_val_test_split()
     train_index = dataset.augment_train()
-    masks_aug, y_reg, y_cls = dataset.get_data_Xy()
+    masks_aug, y_reg = dataset.get_data_Xy()
 
     (
         masks_train,
         y_reg_train,
-        y_cls_train,
         masks_val,
         y_reg_val,
-        y_cls_val,
         masks_test,
         y_reg_test,
-        y_cls_test,
         test_idx,
         train_index,
     ) = tuple(
@@ -52,13 +50,10 @@ if __name__ == "__main__":
             (
                 masks_aug[train_index],
                 y_reg[train_index],
-                y_cls[train_index],
                 masks_aug[val_idx],
                 y_reg[val_idx],
-                y_cls[val_idx],
                 masks_aug[test_index],
                 y_reg[test_index],
-                y_cls[test_index],
                 test_index,
                 train_index,
             ),
@@ -69,16 +64,15 @@ if __name__ == "__main__":
         TensorDataset(
             masks_train,
             y_reg_train,
-            y_cls_train,
         ),
-        num_workers=12,
+        num_workers=4,
         batch_size=10,
         shuffle=True,
     )
 
     val_loader = DataLoader(
-        TensorDataset(masks_val, y_reg_val, y_cls_val),
-        num_workers=12,
+        TensorDataset(masks_val, y_reg_val),
+        num_workers=4,
     )
 
     test_len = test_index.shape[0]
@@ -86,12 +80,11 @@ if __name__ == "__main__":
         TensorDataset(
             masks_test,
             y_reg_test,
-            y_cls_test,
             test_idx,
             masks_train[0:test_len],  # mask_train = [0:11] or [0:3]
             train_index[0:test_len],  # mask_train = [0:11] or [0:3]
         ),
-        num_workers=12,
+        num_workers=4,
     )
 
     trainer = pl.Trainer(

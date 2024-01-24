@@ -1,6 +1,7 @@
 """Lightning module for CNN training"""
 import torch
 import torch.nn.functional as F
+
 from src.modules.lightning_cnn import LitCNN
 
 
@@ -20,7 +21,6 @@ class BodyCNN(LitCNN):  # pylint: disable=too-many-ancestors
 
         Args:
             cnn (torch.nn.Module): CNN module with multi-head output for keypoints regression
-                and angle classification
         """
         super().__init__(
             learning_rate=learning_rate,
@@ -51,9 +51,8 @@ class BodyCNN(LitCNN):  # pylint: disable=too-many-ancestors
                 name, param, global_step=self.global_step
             )
 
-        x, y_reg, y_cls = batch
+        x, y_reg = batch
         y_reg = y_reg.view(y_reg.size(0), -1)  # shape=(N_batch, N_out)
-        y_cls = y_cls.view(-1, 1)  # shape=(N_batch, 1)
 
         y_reg_hat = self.cnn(x)
         train_mse_loss = self.weighted_mse_loss(y_reg_hat, y_reg)
@@ -75,9 +74,8 @@ class BodyCNN(LitCNN):  # pylint: disable=too-many-ancestors
             batch (list[torch.Tensor]): input batch
             batch_idx (int): batch index
         """
-        x, y_reg, y_cls = batch
+        x, y_reg = batch
         y_reg = y_reg.view(1, -1)  # shape=(1, N_out)
-        y_cls = y_cls.view(1, -1)  # shape=(1, 1)
 
         y_reg_hat = self.cnn(x)
         val_mse_loss = self.weighted_mse_loss(y_reg_hat, y_reg)
