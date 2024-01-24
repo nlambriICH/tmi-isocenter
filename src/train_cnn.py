@@ -1,10 +1,9 @@
 """Script for model training"""
 import lightning.pytorch as pl
-import torch
 from lightning.pytorch.callbacks import LearningRateMonitor, ModelSummary
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.loggers import TensorBoardLogger
-from torch.utils.data import DataLoader, TensorDataset
+from torch.utils.data import DataLoader
 
 from src.config.constants import MODEL, NUM_WORKERS
 
@@ -31,59 +30,22 @@ if __name__ == "__main__":
         lightning_cnn = LitCNN()
         name = "whole_model"
 
-    _, val_idx, test_index = dataset.train_val_test_split()
-    train_index = dataset.augment_train()
-    masks_aug, y_reg = dataset.get_data_Xy()
-
-    (
-        masks_train,
-        y_reg_train,
-        masks_val,
-        y_reg_val,
-        masks_test,
-        y_reg_test,
-        test_idx,
-        train_index,
-    ) = tuple(
-        map(
-            torch.Tensor,
-            (
-                masks_aug[train_index],
-                y_reg[train_index],
-                masks_aug[val_idx],
-                y_reg[val_idx],
-                masks_aug[test_index],
-                y_reg[test_index],
-                test_index,
-                train_index,
-            ),
-        )
-    )
+    train_dataset, val_dataset, test_dataset = dataset.get_dataset()
 
     train_loader = DataLoader(
-        TensorDataset(
-            masks_train,
-            y_reg_train,
-        ),
+        train_dataset,
         num_workers=NUM_WORKERS,
         batch_size=10,
         shuffle=True,
     )
 
     val_loader = DataLoader(
-        TensorDataset(masks_val, y_reg_val),
+        val_dataset,
         num_workers=NUM_WORKERS,
     )
 
-    test_len = test_index.shape[0]
     test_loader = DataLoader(
-        TensorDataset(
-            masks_test,
-            y_reg_test,
-            test_idx,
-            masks_train[0:test_len],  # mask_train = [0:11] or [0:3]
-            train_index[0:test_len],  # mask_train = [0:11] or [0:3]
-        ),
+        test_dataset,
         num_workers=NUM_WORKERS,
     )
 

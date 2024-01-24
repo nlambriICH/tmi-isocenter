@@ -3,7 +3,9 @@ from os.path import dirname, join
 
 import numpy as np
 import pandas as pd
+import torch
 from sklearn.model_selection import train_test_split
+from torch.utils.data import TensorDataset
 
 from src.config.constants import INTERIM_DATA_DIR_PATH
 from src.data.augmentation import Augmentation
@@ -134,14 +136,18 @@ class Dataset:
 
         return train_index
 
-    def get_data_Xy(self) -> tuple[np.ndarray, np.ndarray]:
+    def get_dataset(self) -> tuple[TensorDataset, TensorDataset, TensorDataset]:
         """
-        Prepares and returns the input and target data for training a model.
-
-        Returns:
-        tuple[np.ndarray, np.ndarray]: A tuple containing:
+        Prepares and returns the three datasets needed for training a model from:
             - Input data (X): Array of images of shape (C, H, W).
             - Target data (y_reg): Array of unique outputs derived from isocenters and jaws positions.
+
+
+        Returns:
+        tuple[TensorDataset, TensorDataset, TensorDataset]: A tuple containing:
+            - Train dataset: TensorDataset for training of the model.
+            - Validation dataset: TensorDataset for validation of the model.
+            - Test dataset: TensorDataset for testing of the model.
         """
         isocenters_pix_flat = self.isocenters_pix.reshape(self.num_patients, -1)
         jaws_X_pix_flat = self.jaws_X_pix.reshape(self.num_patients, -1)
@@ -150,9 +156,57 @@ class Dataset:
             isocenters_pix_flat, jaws_X_pix_flat, jaws_Y_pix_flat
         )
 
+        _, val_idx, test_index = self.train_val_test_split()
+        train_index = self.augment_train()
+
+        (
+            masks_train,
+            y_reg_train,
+            masks_val,
+            y_reg_val,
+            masks_test,
+            y_reg_test,
+            test_idx,
+            train_index,
+        ) = tuple(
+            map(
+                torch.Tensor,
+                (
+                    self.masks2d[train_index],
+                    y_reg[train_index],
+                    self.masks2d[val_idx],
+                    y_reg[val_idx],
+                    self.masks2d[test_index],
+                    y_reg[test_index],
+                    test_index,
+                    train_index,
+                ),
+            )
+        )
+
+        train_dataset = TensorDataset(
+            masks_train,
+            y_reg_train,
+        )
+
+        val_dataset = TensorDataset(
+            masks_val,
+            y_reg_val,
+        )
+
+        test_len = test_index.shape[0]
+        test_dataset = TensorDataset(
+            masks_test,
+            y_reg_test,
+            test_idx,
+            masks_train[0:test_len],  # mask_train = [0:11] or [0:3]
+            train_index[0:test_len],  # mask_train = [0:11] or [0:3]
+        )
+
         return (
-            self.masks2d,
-            y_reg,
+            train_dataset,
+            val_dataset,
+            test_dataset,
         )
 
     def unique_output(
