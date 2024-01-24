@@ -5,7 +5,7 @@ from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.loggers import TensorBoardLogger
 from torch.utils.data import DataLoader
 
-from src.config.constants import MODEL, NUM_WORKERS
+from src.config.constants import COLL_5_355, MODEL, NUM_WORKERS
 
 if __name__ == "__main__":
     if MODEL == "arms":
@@ -13,15 +13,23 @@ if __name__ == "__main__":
         from src.modules.arms_cnn import ArmCNN
 
         dataset = DatasetArms()
-        lightning_cnn = ArmCNN()
-        name = "arms_model"
+        if COLL_5_355:
+            lightning_cnn = ArmCNN(output=24)
+            name = "arms_model_5_355"
+        else:
+            lightning_cnn = ArmCNN()
+            name = "arms_model_90"
     elif MODEL == "body":
         from src.data.dataset_body import DatasetBody
         from src.modules.body_cnn import BodyCNN
 
         dataset = DatasetBody()
-        lightning_cnn = BodyCNN()
-        name = "body_model"
+        if COLL_5_355:
+            lightning_cnn = BodyCNN(output=19)
+            name = "body_model_5_355"
+        else:
+            lightning_cnn = BodyCNN()
+            name = "body_model_90"
     else:
         from src.data.dataset import Dataset
         from src.modules.lightning_cnn import LitCNN
@@ -64,6 +72,7 @@ if __name__ == "__main__":
         ],
         max_epochs=50,
         log_every_n_steps=1,
+        fast_dev_run=True,
     )
 
     trainer.fit(
