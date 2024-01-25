@@ -72,7 +72,6 @@ if __name__ == "__main__":
         ],
         max_epochs=50,
         log_every_n_steps=1,
-        fast_dev_run=True,
     )
 
     trainer.fit(
