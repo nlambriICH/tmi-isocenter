@@ -1,6 +1,7 @@
 """Dataset utility functions"""
 import numpy as np
 from sklearn.model_selection import train_test_split
+
 from src.data.dataset import Dataset
 
 
@@ -17,13 +18,21 @@ class DatasetArms(Dataset):
           minimum elements (only unique information).
     """
 
-    def __init__(self) -> None:
+    def __init__(self, output=30) -> None:
         """
         Initialize the `DatasetArms` class.
 
         This constructor initializes the class and filters the dataset to work only with entries where isocenters
-        are positioned on the arms.
+        are positioned on the arms. Thus it takes as an argument the regression head's dimension.
+
+        Args:
+            output (int): Dimension of the Regression Head.
+
+        Notes:
+            - The default output dimension is 30, which is the minimum number of parameters for the model with 90 degrees collimator angle.
+            - For the the model with 5 and 355 degrees collimator angle the output dimension is 24.
         """
+        self.output = output
         super().__init__()
         iso_on_arms = self.df_patient_info.IsocenterOnArms.to_numpy(dtype=bool)
         self.df_patient_info = self.df_patient_info.iloc[iso_on_arms]
@@ -73,7 +82,7 @@ class DatasetArms(Dataset):
 
         Returns:
             np.ndarray: Array with the unique values from the input data.
-                The resulting array has a shape of (self.num_patients, 1, 32).
+                The resulting array has a shape of (self.num_patients, 1, self.output).
 
         Notes:
             - The resulting array contains 7 values for the isocenters,
@@ -81,7 +90,7 @@ class DatasetArms(Dataset):
             - Specific indices are used to select the unique values from the input arrays.
             Details about the selected indices can be found in the function implementation.
         """
-        y_reg = np.zeros(shape=(self.num_patients, 1, 30), dtype=float)
+        y_reg = np.zeros(shape=(self.num_patients, 1, self.output), dtype=float)
         for i, (iso, jaw_X_pix, jaw_Y_pix) in enumerate(
             zip(isocenters_pix_flat, jaws_X_pix_flat, jaws_Y_pix_flat)
         ):
@@ -125,6 +134,24 @@ class DatasetArms(Dataset):
                 18,
                 19,
             ]
+
+            if (
+                self.output == 24
+            ):  # additional unused X_Jaws' values due to leg fields symmetries
+                unused_idx_5_355 = [
+                    0,  # legs
+                    1,  # legs
+                    2,  # legs
+                    3,  # legs
+                ]
+                unused_idx = unused_idx_5_355 + unused_idx
+                for i in range(2):
+                    unique_Y_idx.remove(
+                        i * 2
+                    )  # remove [0,2] legs due to Y_Jaws being fixed
+
+            y_jaw_X = np.delete(jaw_X_pix, unused_idx)
+
             # Keep [0,2] legs, 4 = one values fields (pelvis + chest), 8 = third iso, [16,17,18,19] head, [20,22] = arms
             y_jaw_Y = jaw_Y_pix[unique_Y_idx]
             y_reg_local = np.concatenate(

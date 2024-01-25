@@ -12,24 +12,28 @@ if __name__ == "__main__":
         from src.data.dataset_arms import DatasetArms
         from src.modules.arms_cnn import ArmCNN
 
-        dataset = DatasetArms()
         if COLL_5_355:
-            lightning_cnn = ArmCNN(output=24)
+            output = 24
             name = "arms_model_5_355"
         else:
+            output = 30
             lightning_cnn = ArmCNN()
             name = "arms_model_90"
+
+        dataset = DatasetArms(output)
+        lightning_cnn = ArmCNN(output=output)
     elif MODEL == "body":
         from src.data.dataset_body import DatasetBody
         from src.modules.body_cnn import BodyCNN
 
-        dataset = DatasetBody()
         if COLL_5_355:
-            lightning_cnn = BodyCNN(output=19)
+            output = 19
             name = "body_model_5_355"
         else:
-            lightning_cnn = BodyCNN()
+            output = 25
             name = "body_model_90"
+        dataset = DatasetBody(output)
+        lightning_cnn = BodyCNN(output=output)
     else:
         from src.data.dataset import Dataset
         from src.modules.lightning_cnn import LitCNN
