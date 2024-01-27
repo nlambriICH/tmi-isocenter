@@ -98,9 +98,9 @@ class DatasetBody(Dataset):
                     3,  # legs
                 ]
                 unused_idx = unused_idx_5_355 + unused_idx
-                for i in range(2):
+                for z in range(2):
                     unique_Y_idx.remove(
-                        i * 2
+                        z * 2
                     )  # remove [0,2] legs due to Y_Jaws being fixed
 
             y_jaw_X = np.delete(jaw_X_pix, unused_idx)
