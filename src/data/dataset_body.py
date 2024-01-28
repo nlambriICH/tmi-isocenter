@@ -64,17 +64,21 @@ class DatasetBody(Dataset):
 
             # X_Jaws: take all the values except the for thorax, chest and head
 
-            unused_idx = [
-                5,  # overlap fourth
-                9,  # overlap third
-                11,  # third on iso
-                13,  # overlap chest
-                15,  # chest symmetry on iso
-                19,  # head symmetry on iso
-                20,  # arms
-                21,  # arms
-                22,  # arms
-                23,  # arms
+            unique_X_idx = [
+                0,
+                1,
+                2,
+                3,
+                4,
+                6,
+                7,
+                8,
+                10,
+                12,
+                14,
+                16,
+                17,
+                18,
             ]
 
             # Y_Jaws: exploit the body's symmetry
@@ -90,22 +94,20 @@ class DatasetBody(Dataset):
 
             if (
                 self.output == 19
-            ):  # additional unused X_Jaws' values due to leg fields symmetries
-                unused_idx_5_355 = [
-                    0,  # legs
-                    1,  # legs
-                    2,  # legs
-                    3,  # legs
-                ]
-                unused_idx = unused_idx_5_355 + unused_idx
-                for z in range(2):
-                    unique_Y_idx.remove(
-                        z * 2
-                    )  # remove [0,2] legs due to Y_Jaws being fixed
+            ):  # additional unused Jaws' values due to leg fields symmetries
+                for z in range(4):
+                    if z < 2:
+                        unique_Y_idx.remove(
+                            z * 2
+                        )  # remove [0,2] legs due to Y_Jaws being fixed
+                    unique_X_idx.remove(
+                        z
+                    )  # remove [0,1,2,3] legs due to X_Jaws being symmetryc
 
-            y_jaw_X = np.delete(jaw_X_pix, unused_idx)
+            # Keep [0,1,2,3] legs, [4,6,7] Pelvis, [8,10] = third iso, [12,14] chest, [16,17,18] head
+            y_jaw_X = jaw_X_pix[unique_X_idx]
 
-            # Keep [0,2] legs, 4 = one values fields (pelvis + chest), 8 = third iso, [16,17,18,19] head, [20,22] = arms
+            # Keep [0,2] legs, 4 = one values fields (pelvis + chest), 8 = third iso, [16,17,18,19] head
             y_jaw_Y = jaw_Y_pix[unique_Y_idx]
             y_reg_local = np.concatenate((y_iso_new2, y_jaw_X, y_jaw_Y), axis=0)
             y_reg[i] = y_reg_local

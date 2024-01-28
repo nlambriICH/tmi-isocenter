@@ -111,18 +111,25 @@ class DatasetArms(Dataset):
                     (z + 3) * 3 * 2 + 2
                 ]  # Z-coord one for every couple of iso
 
-            # X_Jaws: take all the values except the for thorax, chest and head
-            unused_idx = [
-                5,  # overlap fourth iso with chest's field
-                8,  # Third iso deleted
-                9,  # Third iso deleted
-                10,  # Third iso deleted
-                11,  # Third iso deleted
-                13,  # overlap chest iso with head 's field
-                15,  # chest symmetry on iso
-                19,  # head symmetry on iso
+            # X_Jaws: take all the values except the for thorax, chest and head. Third Iso removed.
+            unique_X_idx = [
+                0,
+                1,
+                2,
+                3,
+                4,
+                6,
+                7,
+                12,
+                14,
+                16,
+                17,
+                18,
+                20,
+                21,
+                22,
+                23,
             ]
-            y_jaw_X = np.delete(jaw_X_pix, unused_idx)
 
             # Y_Jaws: exploit the body's symmetry
             unique_Y_idx = [
@@ -136,23 +143,21 @@ class DatasetArms(Dataset):
             ]
 
             if (
-                self.output == 24
-            ):  # additional unused X_Jaws' values due to leg fields symmetries
-                unused_idx_5_355 = [
-                    0,  # legs
-                    1,  # legs
-                    2,  # legs
-                    3,  # legs
-                ]
-                unused_idx = unused_idx_5_355 + unused_idx
-                for z in range(2):
-                    unique_Y_idx.remove(
-                        z * 2
-                    )  # remove [0,2] legs due to Y_Jaws being fixed
+                self.output == 19
+            ):  # additional unused Jaws' values due to leg fields symmetries
+                for z in range(4):
+                    if z < 2:
+                        unique_Y_idx.remove(
+                            z * 2
+                        )  # remove [0,2] legs due to Y_Jaws being fixed
+                    unique_X_idx.remove(
+                        z
+                    )  # remove [0,1,2,3] legs due to X_Jaws being symmetryc
 
-            y_jaw_X = np.delete(jaw_X_pix, unused_idx)
+            # Keep [0,1,2,3] legs, [4,6,7] Pelvis, [12,14] chest, [16,17,18] head, [20,21,22,23] = arms
+            y_jaw_X = jaw_X_pix[unique_X_idx]
 
-            # Keep [0,2] legs, 4 = one values fields (pelvis + chest), 8 = third iso, [16,17,18,19] head, [20,22] = arms
+            # Keep [0,2] legs, 4 = one values fields (pelvis + chest), [16,17,18,19] head
             y_jaw_Y = jaw_Y_pix[unique_Y_idx]
             y_reg_local = np.concatenate(
                 (y_iso_new1, y_iso_new2, y_jaw_X, y_jaw_Y), axis=0
