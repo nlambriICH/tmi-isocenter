@@ -16,13 +16,15 @@ class DatasetBody(Dataset):
         without isocenters on the arms. Thus it changes the regression head's dimension depending on COLL_5_355.
 
         Notes:
-            - The default output dimension is 25, which is the minimum number of parameters for the model with 90 degrees collimator angle.
-            - For the the model with 5 and 355 degrees collimator angle the output dimension is 19.
+            - The default output dimension is 25, which is the minimum number of parameters
+            for the model with 90 degrees pelvis collimator angle.
+            - For the the model with 5 and 355 degrees pelvis collimator angle the output dimension is 19.
         """
 
         self.output = OUTPUT_DIM
 
         super().__init__()
+
         iso_on_arms = self.df_patient_info.IsocenterOnArms.to_numpy(dtype=bool)
         self.df_patient_info = self.df_patient_info.iloc[~iso_on_arms]
 
@@ -62,7 +64,6 @@ class DatasetBody(Dataset):
                 ]  # Z-coord one for every couple of iso
 
             # X_Jaws: take all the values except the for thorax, chest and head
-
             unique_X_idx = [
                 0,
                 1,
@@ -95,18 +96,18 @@ class DatasetBody(Dataset):
                 COLL_5_355
             ):  # additional unused Jaws' values due to leg fields symmetries
                 for z in range(4):
-                    if z < 2:
-                        unique_Y_idx.remove(
-                            z * 2
-                        )  # remove [0,2] legs due to Y_Jaws being fixed
                     unique_X_idx.remove(
                         z
-                    )  # remove [0,1,2,3] legs due to X_Jaws being symmetryc
+                    )  # remove [0,1,2,3] pelvis due to X_Jaws symmetry
 
-            # Keep [0,1,2,3] legs, [4,6,7] Pelvis, [8,10] = third iso, [12,14] chest, [16,17,18] head
+                # Remove [0,2] pelvis due to Y_Jaws being fixed
+                unique_Y_idx.remove(0)
+                unique_Y_idx.remove(2)
+
+            # Keep [0,1,2,3] pelvis, [4,6,7] abdomen, [8,10] chest, [12,14] shoulders, [16,17,18] head
             y_jaw_X = jaw_X_pix[unique_X_idx]
 
-            # Keep [0,2] legs, 4 = one values fields (pelvis + chest), 8 = third iso, [16,17,18,19] head
+            # Keep [0,2] pelvis, 4 = one dof pelvis + abdomen, 8 = chest iso, [16,17,18,19] head
             y_jaw_Y = jaw_Y_pix[unique_Y_idx]
             y_reg_local = np.concatenate((y_iso_new2, y_jaw_X, y_jaw_Y), axis=0)
             y_reg[i] = y_reg_local
