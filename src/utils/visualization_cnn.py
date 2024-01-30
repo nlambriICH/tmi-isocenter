@@ -46,14 +46,14 @@ class Visualize:
         patient_idx: int,
     ) -> torch.Tensor:
         """
-        Reshapes the output tensor of the 5_355 Model to one with the same shape of the 90 Model.
+        Reshape the output tensor of the 5_355 model to the 90 model.
 
         Parameters:
         - y_hat (torch.Tensor): Predicted tensor from the 5_355 model.
         - patient_idx (int): Index of the patient in the test set, to be reshaped.
 
         Returns:
-        - torch.Tensor: output tensor with rezised shape.
+        - torch.Tensor: output tensor with resized shape.
 
         """
         pix_spacing = self.df_patient_info.iloc[patient_idx, self.pix_spacing_col_idx]
@@ -598,14 +598,14 @@ class Visualize:
         # Retrieve information of the original shape
         processing_output.original_sizes = [original_size]
         processing_output.inverse_transform()
-        """
+
         local_optimization = Optimization(
             patient_idx=patient_idx,
             processing_output=processing_output,
             aspect_ratio=aspect_ratio,
         )
         local_optimization.optimize()
-        """
+
         if single_fig:
             self.single_figure_plot(
                 patient_idx,
