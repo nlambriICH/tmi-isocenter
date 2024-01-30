@@ -2,7 +2,7 @@
 from src.modules.lightning_cnn import LitCNN
 
 
-class ArmCNN(LitCNN):  # pylint: disable=too-many-ancestors
+class ArmsCNN(LitCNN):  # pylint: disable=too-many-ancestors
     """Lightning module for CNN training"""
 
     def __init__(

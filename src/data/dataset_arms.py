@@ -2,6 +2,7 @@
 import numpy as np
 from sklearn.model_selection import train_test_split
 
+from src.config.constants import COLL_5_355, OUTPUT_DIM
 from src.data.dataset import Dataset
 
 
@@ -18,21 +19,18 @@ class DatasetArms(Dataset):
           minimum elements (only unique information).
     """
 
-    def __init__(self, output=30) -> None:
+    def __init__(self) -> None:
         """
         Initialize the `DatasetArms` class.
 
         This constructor initializes the class and filters the dataset to work only with entries where isocenters
-        are positioned on the arms. Thus it takes as an argument the regression head's dimension.
-
-        Args:
-            output (int): Dimension of the Regression Head.
+        are positioned on the arms. Thus it changes the regression head's dimension.
 
         Notes:
             - The default output dimension is 30, which is the minimum number of parameters for the model with 90 degrees collimator angle.
             - For the the model with 5 and 355 degrees collimator angle the output dimension is 24.
         """
-        self.output = output
+        self.output = OUTPUT_DIM
         super().__init__()
         iso_on_arms = self.df_patient_info.IsocenterOnArms.to_numpy(dtype=bool)
         self.df_patient_info = self.df_patient_info.iloc[iso_on_arms]
@@ -143,7 +141,7 @@ class DatasetArms(Dataset):
             ]
 
             if (
-                self.output == 19
+                COLL_5_355
             ):  # additional unused Jaws' values due to leg fields symmetries
                 for z in range(4):
                     if z < 2:

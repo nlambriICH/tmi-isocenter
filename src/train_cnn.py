@@ -10,30 +10,26 @@ from src.config.constants import COLL_5_355, MODEL, NUM_WORKERS
 if __name__ == "__main__":
     if MODEL == "arms":
         from src.data.dataset_arms import DatasetArms
-        from src.modules.arms_cnn import ArmCNN
+        from src.modules.arms_cnn import ArmsCNN
 
         if COLL_5_355:
-            output = 24
             name = "arms_model_5_355"
         else:
-            output = 30
-            lightning_cnn = ArmCNN()
+            lightning_cnn = ArmsCNN()
             name = "arms_model_90"
 
-        dataset = DatasetArms(output)
-        lightning_cnn = ArmCNN(output=output)
+        dataset = DatasetArms()
+        lightning_cnn = ArmsCNN()
     elif MODEL == "body":
         from src.data.dataset_body import DatasetBody
         from src.modules.body_cnn import BodyCNN
 
         if COLL_5_355:
-            output = 19
             name = "body_model_5_355"
         else:
-            output = 25
             name = "body_model_90"
-        dataset = DatasetBody(output)
-        lightning_cnn = BodyCNN(output=output)
+        dataset = DatasetBody()
+        lightning_cnn = BodyCNN()
     else:
         from src.data.dataset import Dataset
         from src.modules.lightning_cnn import LitCNN

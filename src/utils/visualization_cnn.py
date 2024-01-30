@@ -73,7 +73,7 @@ class Visualize:
             slice_thickness * original_size
         )  # pyright: ignore[reportGeneralTypeIssues]
 
-        if y_hat.shape[0] == 19:
+        if MODEL == "body":
             y_hat_new = np.zeros(shape=25)
 
             for z in range(4):
@@ -598,14 +598,14 @@ class Visualize:
         # Retrieve information of the original shape
         processing_output.original_sizes = [original_size]
         processing_output.inverse_transform()
-
+        """
         local_optimization = Optimization(
             patient_idx=patient_idx,
             processing_output=processing_output,
             aspect_ratio=aspect_ratio,
         )
         local_optimization.optimize()
-
+        """
         if single_fig:
             self.single_figure_plot(
                 patient_idx,

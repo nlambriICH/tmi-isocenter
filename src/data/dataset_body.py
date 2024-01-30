@@ -1,28 +1,27 @@
 """Dataset utility functions"""
 import numpy as np
 
+from src.config.constants import COLL_5_355, OUTPUT_DIM
 from src.data.dataset import Dataset
 
 
 class DatasetBody(Dataset):
     """Dataset class to load and stratify data"""
 
-    def __init__(self, output=25) -> None:
+    def __init__(self) -> None:
         """
         Initialize the `DatasetBody` class.
 
         This constructor initializes the class and filters the dataset to work only with entries
-        without isocenters on the arms. Thus it takes as an argument the regression head's dimension.
-
-        Args:
-            output (int): Dimension of the Regression Head.
+        without isocenters on the arms. Thus it changes the regression head's dimension depending on COLL_5_355.
 
         Notes:
             - The default output dimension is 25, which is the minimum number of parameters for the model with 90 degrees collimator angle.
             - For the the model with 5 and 355 degrees collimator angle the output dimension is 19.
         """
 
-        self.output = output
+        self.output = OUTPUT_DIM
+
         super().__init__()
         iso_on_arms = self.df_patient_info.IsocenterOnArms.to_numpy(dtype=bool)
         self.df_patient_info = self.df_patient_info.iloc[~iso_on_arms]
@@ -93,7 +92,7 @@ class DatasetBody(Dataset):
             ]
 
             if (
-                self.output == 19
+                COLL_5_355
             ):  # additional unused Jaws' values due to leg fields symmetries
                 for z in range(4):
                     if z < 2:
