@@ -1,4 +1,6 @@
 """Lightning module for CNN training"""
+from os import getcwd
+
 import lightning.pytorch as pl
 import torch
 import torch.nn.functional as F
@@ -164,6 +166,38 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
             output=y_reg_hat[0],
             path=self.logger.log_dir,  # pyright: ignore[reportGeneralTypeIssues,reportOptionalMemberAccess]
             mse=test_mse_loss,
+        )
+
+    def predict_step(  # pylint: disable=arguments-differ
+        self, batch: list[torch.Tensor], batch_idx
+    ) -> None:
+        """
+        Prediction loop
+
+        Args:
+            batch (list[torch.Tensor]): input batch
+            batch_idx (int): batch index
+        """
+        (
+            x,
+            y_reg,
+            pred_idx,
+        ) = batch
+
+        y_reg = y_reg.view(1, -1)
+
+        y_reg_hat = self.cnn(x)
+
+        viz = Visualize(
+            self.logger.log_dir  # pyright: ignore[reportOptionalMemberAccess]
+        )
+
+        viz.plot_img(
+            input_img=x.numpy()[0],
+            patient_idx=int(pred_idx.item()),
+            output=y_reg_hat[0],
+            path=getcwd(),  # pyright: ignore[reportGeneralTypeIssues,reportOptionalMemberAccess]
+            single_fig=False,
         )
 
     def forward(  # pylint: disable=arguments-differ

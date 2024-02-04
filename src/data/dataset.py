@@ -209,6 +209,48 @@ class Dataset:
             test_dataset,
         )
 
+    def prediction_dataset(self) -> TensorDataset:
+        """
+        Prepares and returns one dataset needed to evaluate prediction of a model:
+            - Input data (X): Array of images of shape (C, H, W).
+            - Target data (y_reg): Array of unique outputs derived from isocenters and jaws positions.
+
+
+        Returns:
+        TensorDataset: Prediction dataset: TensorDataset for predictions of the model.
+        """
+        isocenters_pix_flat = self.isocenters_pix.reshape(self.num_patients, -1)
+        jaws_X_pix_flat = self.jaws_X_pix.reshape(self.num_patients, -1)
+        jaws_Y_pix_flat = self.jaws_Y_pix.reshape(self.num_patients, -1)
+        y_reg = self.unique_output(
+            isocenters_pix_flat, jaws_X_pix_flat, jaws_Y_pix_flat
+        )
+
+        _, _, predict_index = self.train_val_test_split()
+
+        (
+            masks_pred,
+            y_reg_pred,
+            predict_index,
+        ) = tuple(
+            map(
+                torch.Tensor,
+                (
+                    self.masks2d[predict_index],
+                    y_reg[predict_index],
+                    predict_index,
+                ),
+            )
+        )
+
+        pred_dataset = TensorDataset(
+            masks_pred,
+            y_reg_pred,
+            predict_index,
+        )
+
+        return pred_dataset
+
     def unique_output(
         self, isocenters_pix_flat, jaws_X_pix_flat, jaws_Y_pix_flat
     ) -> np.ndarray:
