@@ -109,8 +109,8 @@ class Visualize:
             y_hat_new[23] = Y1
             y_hat_new[24] = Y1
 
-            for z in range(4):
-                y_hat_new[z + 26] = y_hat[z + 19]
+            for z in range(5):
+                y_hat_new[z + 25] = y_hat[z + 19]
 
         return torch.from_numpy(y_hat_new)
 
