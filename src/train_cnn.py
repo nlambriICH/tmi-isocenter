@@ -1,5 +1,6 @@
 """Script for model training"""
-import lightning.pytorch as pl
+
+from lightning import Trainer
 from lightning.pytorch.callbacks import LearningRateMonitor, ModelSummary
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.loggers import TensorBoardLogger
@@ -57,7 +58,7 @@ if __name__ == "__main__":
         num_workers=NUM_WORKERS,
     )
 
-    trainer = pl.Trainer(
+    trainer = Trainer(
         logger=TensorBoardLogger(
             "lightning_logs",
             name=name,

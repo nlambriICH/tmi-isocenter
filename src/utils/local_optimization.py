@@ -65,12 +65,12 @@ class Optimization:
         self.original_size = int(
             self.df_patient_info.iloc[
                 patient_idx, self.original_sizes_col_idx
-            ]  # pyright: ignore[reportArgumentType]
+            ]  # pyright: ignore[reportGeneralTypeIssues]
         )
         self.slice_thickness = float(
             self.df_patient_info.iloc[
                 patient_idx, self.slice_thickness_col_idx
-            ]  # pyright: ignore[reportArgumentType]
+            ]  # pyright: ignore[reportGeneralTypeIssues]
         )
         self.optimization_result = OptimizationResult()
         self.optimization_search_space = OptimizationSearchSpace()
@@ -173,7 +173,7 @@ class Optimization:
             - self.field_overlap_pixels
         ) * self.aspect_ratio
 
-    def _adjust_field_geometry_body(self) -> None:
+    def _adjust_field_geometry_body_90(self) -> None:
         """Adjust the field geometry predicted by the body model, according to the maximum extension
         of iliac crests and ribs."""
 
@@ -274,7 +274,7 @@ class Optimization:
 
         self._fit_collimator_pelvic_field()
 
-    def _adjust_field_geometry_arms(self) -> None:
+    def _adjust_field_geometry_arms_90(self) -> None:
         """Adjust the field geometry predicted by the arms model, according to the maximum extension
         of iliac crests and ribs."""
 
@@ -481,7 +481,7 @@ class Optimization:
         x_com = round(
             ndimage.center_of_mass(self.processing.masks[0][..., 0])[
                 0
-            ]  # pyright: ignore[reportArgumentType]
+            ]  # pyright: ignore[reportGeneralTypeIssues]
         )
         self.optimization_search_space.y_pixels_right = np.arange(
             x_com - 115, x_com - 50
@@ -617,9 +617,9 @@ class Optimization:
             if COLL_5_355:
                 self._adjust_field_geometry_body_5_355()
             else:
-                self._adjust_field_geometry_body()
+                self._adjust_field_geometry_body_90()
         elif MODEL == "arms":
             if COLL_5_355:
                 self._adjust_field_geometry_arms_5_355()
             else:
-                self._adjust_field_geometry_arms()
+                self._adjust_field_geometry_arms_90()

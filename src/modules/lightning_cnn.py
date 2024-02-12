@@ -1,5 +1,4 @@
 """Lightning module for CNN training"""
-from os import getcwd
 
 import lightning.pytorch as pl
 import torch
@@ -191,6 +190,8 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
         viz = Visualize(
             self.logger.log_dir  # pyright: ignore[reportOptionalMemberAccess]
         )
+
+        from os import getcwd
 
         viz.plot_img(
             input_img=x.numpy()[0],

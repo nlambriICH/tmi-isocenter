@@ -1,4 +1,5 @@
 """Dataset utility functions"""
+
 from os.path import dirname, join
 
 import numpy as np
@@ -144,10 +145,10 @@ class Dataset:
 
 
         Returns:
-        tuple[TensorDataset, TensorDataset, TensorDataset]: A tuple containing:
-            - Train dataset: TensorDataset for training of the model.
-            - Validation dataset: TensorDataset for validation of the model.
-            - Test dataset: TensorDataset for testing of the model.
+            tuple[TensorDataset, TensorDataset, TensorDataset]: A tuple containing:
+                - Train dataset: TensorDataset for training of the model.
+                - Validation dataset: TensorDataset for validation of the model.
+                - Test dataset: TensorDataset for testing of the model.
         """
         isocenters_pix_flat = self.isocenters_pix.reshape(self.num_patients, -1)
         jaws_X_pix_flat = self.jaws_X_pix.reshape(self.num_patients, -1)
@@ -211,13 +212,10 @@ class Dataset:
 
     def prediction_dataset(self) -> TensorDataset:
         """
-        Prepares and returns one dataset needed to evaluate prediction of a model:
-            - Input data (X): Array of images of shape (C, H, W).
-            - Target data (y_reg): Array of unique outputs derived from isocenters and jaws positions.
-
+        Prepares and returns a dataset to evaluate the model's predictions.
 
         Returns:
-        TensorDataset: Prediction dataset: TensorDataset for predictions of the model.
+            TensorDataset: The TensorDataset containing the data to evaluate the model.
         """
         isocenters_pix_flat = self.isocenters_pix.reshape(self.num_patients, -1)
         jaws_X_pix_flat = self.jaws_X_pix.reshape(self.num_patients, -1)
