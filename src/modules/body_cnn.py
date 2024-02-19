@@ -1,7 +1,8 @@
 """Lightning module for CNN training"""
-import torch
-import torch.nn.functional as F
 
+import torch
+
+from src.config.constants import OUTPUT_DIM
 from src.modules.lightning_cnn import LitCNN
 
 
@@ -15,7 +16,7 @@ class BodyCNN(LitCNN):  # pylint: disable=too-many-ancestors
         weight=3,
         focus_on=[1],
         filters=4,
-        output=25,
+        output=OUTPUT_DIM,
     ):
         """Initialize the LitCNN module
 
