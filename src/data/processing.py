@@ -149,7 +149,7 @@ class Processing:
             iso_kps_img_rot = rot.augment_keypoints(iso_kps_img)
             masks_rot.append(img_rotated)
             isos_kps_temp_rot = (
-                iso_kps_img_rot.to_xy_array()  # pyright: ignore[reportOptionalMemberAccess, reportGeneralTypeIssues]
+                iso_kps_img_rot.to_xy_array()  # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess]
             )
             isos_kps_temp_rot[get_zero_row_idx(iso_pix)] = 0
             isos_kps_img_rot3D[i] = np.insert(
@@ -264,7 +264,7 @@ class Processing:
             iso_kps_img_rot = rot.augment_keypoints(iso_kps_img)
             masks_rot.append(img_rotated)
             isos_kps_temp_rot = (
-                iso_kps_img_rot.to_xy_array()  # pyright: ignore[reportOptionalMemberAccess, reportGeneralTypeIssues]
+                iso_kps_img_rot.to_xy_array()  # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess]
             )
             isos_kps_temp_rot[get_zero_row_idx(iso_pix)] = 0
             # Swap columns to original dicom coordinate system

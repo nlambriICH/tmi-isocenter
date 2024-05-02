@@ -1,27 +1,36 @@
 """Script for model training"""
-import lightning.pytorch as pl
+
+from lightning import Trainer
 from lightning.pytorch.callbacks import LearningRateMonitor, ModelSummary
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.loggers import TensorBoardLogger
 from torch.utils.data import DataLoader
 
-from src.config.constants import MODEL, NUM_WORKERS
+from src.config.constants import COLL_5_355, MODEL, NUM_WORKERS
 
 if __name__ == "__main__":
     if MODEL == "arms":
         from src.data.dataset_arms import DatasetArms
-        from src.modules.arms_cnn import ArmCNN
+        from src.modules.arms_cnn import ArmsCNN
+
+        if COLL_5_355:
+            name = "arms_model_5_355"
+        else:
+            lightning_cnn = ArmsCNN()
+            name = "arms_model_90"
 
         dataset = DatasetArms()
-        lightning_cnn = ArmCNN()
-        name = "arms_model"
+        lightning_cnn = ArmsCNN()
     elif MODEL == "body":
         from src.data.dataset_body import DatasetBody
         from src.modules.body_cnn import BodyCNN
 
+        if COLL_5_355:
+            name = "body_model_5_355"
+        else:
+            name = "body_model_90"
         dataset = DatasetBody()
         lightning_cnn = BodyCNN()
-        name = "body_model"
     else:
         from src.data.dataset import Dataset
         from src.modules.lightning_cnn import LitCNN
@@ -49,12 +58,12 @@ if __name__ == "__main__":
         num_workers=NUM_WORKERS,
     )
 
-    trainer = pl.Trainer(
+    trainer = Trainer(
         logger=TensorBoardLogger(
             "lightning_logs",
             name=name,
             log_graph=True,
-        ),  # pyright: ignore[reportGeneralTypeIssues]
+        ),  # pyright: ignore[reportArgumentType]
         callbacks=[  # pyright: ignore[reportGeneralTypeIssues]
             EarlyStopping(monitor="val_mse_loss", mode="min", patience=7),
             ModelSummary(

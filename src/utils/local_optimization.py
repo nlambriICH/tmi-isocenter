@@ -6,7 +6,7 @@ import pandas as pd
 from gradient_free_optimizers import GridSearchOptimizer, ParallelTemperingOptimizer
 from scipy import ndimage
 
-from src.config.constants import MODEL, RAW_DATA_DIR_PATH
+from src.config.constants import COLL_5_355, MODEL, RAW_DATA_DIR_PATH
 from src.data.processing import Processing
 
 
@@ -62,15 +62,23 @@ class Optimization:
         self.slice_thickness_col_idx = self.df_patient_info.columns.get_loc(
             key="SliceThickness"
         )
+        self.pix_spacing_col_idx = self.df_patient_info.columns.get_loc(
+            key="PixelSpacing"
+        )
         self.original_size = int(
             self.df_patient_info.iloc[
                 patient_idx, self.original_sizes_col_idx
-            ]  # pyright: ignore[reportGeneralTypeIssues]
+            ]  # pyright: ignore[reportCallIssue, reportArgumentType]
         )
         self.slice_thickness = float(
             self.df_patient_info.iloc[
                 patient_idx, self.slice_thickness_col_idx
-            ]  # pyright: ignore[reportGeneralTypeIssues]
+            ]  # pyright: ignore[reportCallIssue, reportArgumentType]
+        )
+        self.pix_spacing = float(
+            self.df_patient_info.iloc[
+                patient_idx, self.pix_spacing_col_idx
+            ]  # pyright: ignore[reportCallIssue, reportArgumentType]
         )
         self.optimization_result = OptimizationResult()
         self.optimization_search_space = OptimizationSearchSpace()
@@ -78,7 +86,101 @@ class Optimization:
         self.aspect_ratio = aspect_ratio
         self.field_overlap_pixels = 10
 
-    def _adjust_field_geometry_body(self) -> None:
+    def _adjust_field_geometry_body_5_355(self):
+        """Adjust the field geometry predicted by the body model, according to the maximum extension
+        of iliac crests and ribs."""
+        x_iliac = (
+            self.optimization_result.x_pixel_iliac
+        )  # iliac crests 'x' pixel location
+        x_ribs = self.optimization_result.x_pixel_ribs  # ribs pixel 'x' location
+
+        self.processing.isocenters_pix[0][2, 2] = (x_iliac + x_ribs) / 2
+        self.processing.isocenters_pix[0][3, 2] = self.processing.isocenters_pix[0][
+            2, 2
+        ]
+
+        # Fix aperture of pelvis field
+        if x_ribs - x_iliac < self.field_overlap_pixels:
+            self.processing.jaws_X_pix[0][2, 0] = (
+                x_iliac - self.processing.isocenters_pix[0][2, 2]
+            ) * self.aspect_ratio
+            self.processing.jaws_X_pix[0][3, 1] = (
+                x_ribs - self.processing.isocenters_pix[0][2, 2]
+            ) * self.aspect_ratio
+        else:
+            self.processing.jaws_X_pix[0][2, 0] = (
+                (-self.field_overlap_pixels) * self.aspect_ratio / 2
+            )
+            self.processing.jaws_X_pix[0][3, 1] = (
+                (self.field_overlap_pixels) * self.aspect_ratio / 2
+            )
+
+        # Fix third isocenter
+        self.processing.isocenters_pix[0][4, 2] = (
+            self.processing.isocenters_pix[0][2, 2]
+            + self.processing.isocenters_pix[0][6, 2]
+        ) / 2
+        self.processing.isocenters_pix[0][5, 2] = self.processing.isocenters_pix[0][
+            4, 2
+        ]
+
+        # Increase aperture of abdominal field (upper)
+        self.processing.jaws_X_pix[0][2, 1] = (
+            self.processing.isocenters_pix[0][4, 2]
+            - self.processing.isocenters_pix[0][2, 2]
+            + self.field_overlap_pixels
+        ) * self.aspect_ratio + self.processing.jaws_X_pix[0][5, 0]
+
+        # Fix overlap between abdomen and thorax
+        self.processing.jaws_X_pix[0][5, 0] = (
+            (
+                self.processing.isocenters_pix[0][2, 2]
+                - self.processing.isocenters_pix[0][4, 2]
+                - self.field_overlap_pixels
+            )
+            * self.aspect_ratio
+            / 2
+        )
+        self.processing.jaws_X_pix[0][2, 1] = (
+            (
+                self.processing.isocenters_pix[0][4, 2]
+                - self.processing.isocenters_pix[0][2, 2]
+                + self.field_overlap_pixels
+            )
+            * self.aspect_ratio
+            / 2
+        )
+
+        # Fix overlap of thorax field (upper)
+        self.processing.jaws_X_pix[0][4, 1] = (
+            (
+                self.processing.isocenters_pix[0][6, 2]
+                - self.processing.isocenters_pix[0][4, 2]
+                + self.field_overlap_pixels
+            )
+            * self.aspect_ratio
+            / 2
+        )
+
+        self.processing.jaws_X_pix[0][7, 0] = (
+            (
+                self.processing.isocenters_pix[0][4, 2]
+                - self.processing.isocenters_pix[0][6, 2]
+                - self.field_overlap_pixels
+            )
+            * self.aspect_ratio
+            / 2
+        )
+
+        # Fix overlap of pelvis and abdomen field
+        self.processing.jaws_X_pix[0][3, 0] = (
+            self.processing.isocenters_pix[0][0, 2]
+            - self.processing.isocenters_pix[0][2, 2]
+            + self.processing.jaws_Y_pix[0][0, 1]
+            - self.field_overlap_pixels
+        ) * self.aspect_ratio
+
+    def _adjust_field_geometry_body_90(self) -> None:
         """Adjust the field geometry predicted by the body model, according to the maximum extension
         of iliac crests and ribs."""
 
@@ -179,7 +281,7 @@ class Optimization:
 
         self._fit_collimator_pelvic_field()
 
-    def _adjust_field_geometry_arms(self) -> None:
+    def _adjust_field_geometry_arms_90(self) -> None:
         """Adjust the field geometry predicted by the arms model, according to the maximum extension
         of iliac crests and ribs."""
 
@@ -262,6 +364,93 @@ class Optimization:
 
         self._fit_collimator_pelvic_field()
 
+    def _adjust_field_geometry_arms_5_355(self) -> None:
+        x_iliac = (
+            self.optimization_result.x_pixel_iliac
+        )  # iliac crests 'x' pixel location
+        x_ribs = self.optimization_result.x_pixel_ribs  # ribs pixel 'x' location
+
+        if (
+            x_ribs - (x_ribs - x_iliac) / 2
+            < self.processing.isocenters_pix[0][2, 2]
+            < x_ribs + (x_ribs - x_iliac)
+            or self.processing.isocenters_pix[0][2, 2] < x_iliac
+            or self.processing.isocenters_pix[0][2, 2] > x_ribs
+        ):
+            old_iso = self.processing.isocenters_pix[0][2, 2]
+            # Setting the isocenters for arms model at 3/4 space
+            self.processing.isocenters_pix[0][2, 2] = (
+                x_iliac + (x_ribs - x_iliac) * 3 / 4
+            )
+            self.processing.isocenters_pix[0][3, 2] = (
+                x_iliac + (x_ribs - x_iliac) * 3 / 4
+            )
+            # Adjust the fields (abdomen/pelvis) after the isocenter shift, with an overlap specified in config.yml
+            self.processing.jaws_X_pix[0][2, 1] = (
+                self.processing.isocenters_pix[0][6, 2] - old_iso
+            ) * self.aspect_ratio + self.processing.jaws_X_pix[0][7, 0]
+
+        # Fix arms isocenters symmetry
+        max_distance = 215 / self.pix_spacing
+        symmetry_axis = self.processing.isocenters_pix[0][2, 0]
+        upper_isocenter = self.processing.isocenters_pix[0][11, 0] - symmetry_axis
+        lower_isocenter = symmetry_axis - self.processing.isocenters_pix[0][10, 0]
+
+        if upper_isocenter < lower_isocenter:
+            self.processing.isocenters_pix[0][10, 0] = symmetry_axis - upper_isocenter
+        else:
+            self.processing.isocenters_pix[0][11, 0] = symmetry_axis + lower_isocenter
+
+        if upper_isocenter > max_distance or lower_isocenter > max_distance:
+            print(
+                f"Maximum distance allowed between arms isocenters is {max_distance:.0f} pixels."
+                " Isocenters moved accordingly."
+            )
+            self.processing.isocenters_pix[0][10, 0] = symmetry_axis - max_distance
+            self.processing.isocenters_pix[0][11, 0] = symmetry_axis + max_distance
+
+        # Isocenter on the spine
+        if x_iliac < self.processing.isocenters_pix[0][2, 2] < x_ribs:
+            self.processing.jaws_X_pix[0][2, 0] = (
+                (x_iliac - self.processing.isocenters_pix[0][2, 2])
+                * self.aspect_ratio
+                / 2
+            )
+            self.processing.jaws_X_pix[0][3, 1] = (
+                (x_ribs - self.processing.isocenters_pix[0][2, 2])
+                * self.aspect_ratio
+                / 2
+            )
+
+            # Fix thorax isocenter
+            self.processing.isocenters_pix[0][6, 2] = (
+                self.processing.isocenters_pix[0][2, 2]
+                + self.processing.isocenters_pix[0][8, 2]
+            ) / 2
+            self.processing.isocenters_pix[0][7, 2] = self.processing.isocenters_pix[0][
+                6, 2
+            ]
+
+            # Ensure overlap of abdominal field (lower) and pelvic field (upper), with an overlap specified in config.yml
+            min_aperture = -(  # minimum aperture of the lower abdominal field needed to guarantee minimum overlap
+                (
+                    self.processing.isocenters_pix[0][2, 2]
+                    - self.processing.isocenters_pix[0][0, 2]
+                    + self.field_overlap_pixels
+                    - self.processing.jaws_Y_pix[0][0, 1]
+                )
+                * self.aspect_ratio
+            )
+            if abs(self.processing.jaws_X_pix[0][3, 0]) < abs(min_aperture):
+                self.processing.jaws_X_pix[0][3, 0] = min_aperture
+
+            # Ensure overlap of abdominal field (upper) and thorax field (lower), with an overlap specified in config.yml
+            self.processing.jaws_X_pix[0][2, 1] = (
+                self.processing.isocenters_pix[0][6, 2]
+                - self.processing.isocenters_pix[0][2, 2]
+                + self.field_overlap_pixels
+            ) * self.aspect_ratio + self.processing.jaws_X_pix[0][7, 0]
+
     def _fit_collimator_pelvic_field(self):
         ptv_mask = self.processing.masks[0][..., 1]
         y_pixels = np.arange(
@@ -329,7 +518,7 @@ class Optimization:
         x_com = round(
             ndimage.center_of_mass(self.processing.masks[0][..., 0])[
                 0
-            ]  # pyright: ignore[reportGeneralTypeIssues]
+            ]  # pyright: ignore[reportArgumentType]
         )
         self.optimization_search_space.y_pixels_right = np.arange(
             x_com - 115, x_com - 50
@@ -452,9 +641,9 @@ class Optimization:
                 head_pelvis_iso_dist_pix - maximum_extension_pix
             )
             print(
-                f"Distance between head-pelvis isocenters was {head_pelvis_iso_dist_pix} pixels."
-                " Maximum allowed distance is {maximum_extension_pix} (= 84 cm)."
-                " Shifting pelvis isocenters by {shift_pixels} pixels.",
+                f"Distance between head-pelvis isocenters was {head_pelvis_iso_dist_pix:.0f} pixels."
+                f" Maximum allowed distance is {maximum_extension_pix:.0f} (= 84 cm)."
+                f" Shifting pelvis isocenters by {shift_pixels:.0f} pixels.",
             )
             self.processing.isocenters_pix[0][[0, 1], 2] = (
                 self.processing.isocenters_pix[0][0, 2] + shift_pixels
@@ -462,6 +651,12 @@ class Optimization:
 
         self._search_iliac_and_ribs()
         if MODEL == "body":
-            self._adjust_field_geometry_body()
+            if COLL_5_355:
+                self._adjust_field_geometry_body_5_355()
+            else:
+                self._adjust_field_geometry_body_90()
         elif MODEL == "arms":
-            self._adjust_field_geometry_arms()
+            if COLL_5_355:
+                self._adjust_field_geometry_arms_5_355()
+            else:
+                self._adjust_field_geometry_arms_90()

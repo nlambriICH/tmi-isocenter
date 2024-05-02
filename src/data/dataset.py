@@ -1,4 +1,5 @@
 """Dataset utility functions"""
+
 from os.path import dirname, join
 
 import numpy as np
@@ -77,14 +78,14 @@ class Dataset:
     def train_val_test_split(
         self,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Get the train/val/test indexes :
-            - 10% patients for test set
-            - 80% for training
-            - 10% for validation
+        """
+        Split the dataset into training, validation, and test sets.
 
         Returns:
-            tuple(np.ndarray, np.ndarray): train, val, and test index splits
+            tuple(np.ndarray, np.ndarray, np.ndarray): Index splits for train, validation, and test sets.
 
+        Notes:
+            - The default split ratio is 80% for training, 10% for validation, and 10% for testing.
         """
 
         _, test_idx = train_test_split(
@@ -144,10 +145,10 @@ class Dataset:
 
 
         Returns:
-        tuple[TensorDataset, TensorDataset, TensorDataset]: A tuple containing:
-            - Train dataset: TensorDataset for training of the model.
-            - Validation dataset: TensorDataset for validation of the model.
-            - Test dataset: TensorDataset for testing of the model.
+            tuple[TensorDataset, TensorDataset, TensorDataset]: A tuple containing:
+                - Train dataset: TensorDataset for training of the model.
+                - Validation dataset: TensorDataset for validation of the model.
+                - Test dataset: TensorDataset for testing of the model.
         """
         isocenters_pix_flat = self.isocenters_pix.reshape(self.num_patients, -1)
         jaws_X_pix_flat = self.jaws_X_pix.reshape(self.num_patients, -1)
@@ -208,6 +209,45 @@ class Dataset:
             val_dataset,
             test_dataset,
         )
+
+    def prediction_dataset(self) -> TensorDataset:
+        """
+        Prepares and returns a dataset to evaluate the model's predictions.
+
+        Returns:
+            TensorDataset: The TensorDataset containing the data to evaluate the model.
+        """
+        isocenters_pix_flat = self.isocenters_pix.reshape(self.num_patients, -1)
+        jaws_X_pix_flat = self.jaws_X_pix.reshape(self.num_patients, -1)
+        jaws_Y_pix_flat = self.jaws_Y_pix.reshape(self.num_patients, -1)
+        y_reg = self.unique_output(
+            isocenters_pix_flat, jaws_X_pix_flat, jaws_Y_pix_flat
+        )
+
+        _, _, predict_index = self.train_val_test_split()
+
+        (
+            masks,
+            y_reg,
+            predict_index,
+        ) = tuple(
+            map(
+                torch.Tensor,
+                (
+                    self.masks2d[predict_index],
+                    y_reg[predict_index],
+                    predict_index,
+                ),
+            )
+        )
+
+        pred_dataset = TensorDataset(
+            masks,
+            y_reg,
+            predict_index,
+        )
+
+        return pred_dataset
 
     def unique_output(
         self, isocenters_pix_flat, jaws_X_pix_flat, jaws_Y_pix_flat

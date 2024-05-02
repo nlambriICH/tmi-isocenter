@@ -1,4 +1,5 @@
 """Lightning module for CNN training"""
+
 import lightning.pytorch as pl
 import torch
 import torch.nn.functional as F
@@ -38,7 +39,7 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
         )
 
         self.learning_rate = learning_rate
-        self.train_mse_weight = mse_loss_weight
+        self.mse_loss_weight = mse_loss_weight
 
         self.weights = torch.ones(output)
         self.weights[focus_on] = weight
@@ -78,7 +79,7 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
             self.logger.log_graph(self)  # pyright: ignore[reportOptionalMemberAccess]
 
         for name, param in self.named_parameters():
-            self.logger.experiment.add_histogram(  # pyright: ignore[reportOptionalMemberAccess , reportGeneralTypeIssues]
+            self.logger.experiment.add_histogram(  # pyright: ignore[reportOptionalMemberAccess , reportAttributeAccessIssue]
                 name, param, global_step=self.global_step
             )
 
@@ -87,7 +88,7 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
 
         y_reg_hat = self.cnn(x)
         train_mse_loss = self.weighted_mse_loss(y_reg_hat, y_reg)
-        train_loss = self.train_mse_weight * train_mse_loss
+        train_loss = self.mse_loss_weight * train_mse_loss
         metrics = {
             "train_mse_loss": train_mse_loss,
             "train_loss": train_loss,
@@ -146,25 +147,60 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
         self.log_dict(metrics)
 
         # Check overfitting
-        viz = Visualize(
-            self.logger.log_dir  # pyright: ignore[reportOptionalMemberAccess]
-        )
+        viz = Visualize()
 
         # Two plots: (1) train (overfitting) and (2) test images
         viz.plot_img(
             input_img=x_train.numpy()[0],
             patient_idx=int(train_index.item()),
             output=y_train_reg_hat[0],
-            path=self.logger.log_dir,  # pyright: ignore[reportGeneralTypeIssues,reportOptionalMemberAccess]
+            path=self.logger.log_dir,  # pyright: ignore[reportArgumentType,reportOptionalMemberAccess]
             single_fig=True,
         )
         viz.plot_img(
             input_img=x.numpy()[0],
             patient_idx=int(test_idx.item()),
             output=y_reg_hat[0],
-            path=self.logger.log_dir,  # pyright: ignore[reportGeneralTypeIssues,reportOptionalMemberAccess]
+            path=self.logger.log_dir,  # pyright: ignore[reportArgumentType,reportOptionalMemberAccess]
             mse=test_mse_loss,
         )
+
+    def predict_step(  # pylint: disable=arguments-differ
+        self, batch: list[torch.Tensor], batch_idx
+    ) -> torch.Tensor:
+        """
+        Prediction loop
+
+        Args:
+            batch (list[torch.Tensor]): input batch
+            batch_idx (int): batch index
+
+        Returns:
+            torch.Tensor: Raw predictions of isocenter locations and jaws apertures.
+        """
+        (
+            x,
+            y_reg,
+            pred_idx,
+        ) = batch
+
+        y_reg = y_reg.view(1, -1)
+
+        y_reg_hat = self.cnn(x)
+
+        viz = Visualize()
+
+        from os import getcwd
+
+        viz.plot_img(
+            input_img=x.numpy()[0],
+            patient_idx=int(pred_idx.item()),
+            output=y_reg_hat[0],
+            path=getcwd(),  # pyright: ignore[reportArgumentType,reportOptionalMemberAccess]
+            single_fig=False,
+        )
+
+        return y_reg_hat
 
     def forward(  # pylint: disable=arguments-differ
         self, x: torch.Tensor

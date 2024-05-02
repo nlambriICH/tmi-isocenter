@@ -1,6 +1,8 @@
 """Dataset utility functions"""
+
 import numpy as np
-from sklearn.model_selection import train_test_split
+
+from src.config.constants import COLL_5_355, OUTPUT_DIM
 from src.data.dataset import Dataset
 
 
@@ -21,44 +23,18 @@ class DatasetArms(Dataset):
         """
         Initialize the `DatasetArms` class.
 
-        This constructor initializes the class and filters the dataset to work only with entries where isocenters
-        are positioned on the arms.
-        """
-        super().__init__()
-        iso_on_arms = self.df_patient_info.IsocenterOnArms.to_numpy(dtype=bool)
-        self.df_patient_info = self.df_patient_info.iloc[iso_on_arms]
-
-    def train_val_test_split(
-        self,
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """
-        Split the dataset into training, validation, and test sets.
-
-        Returns:
-            tuple(np.ndarray, np.ndarray, np.ndarray): Index splits for train, validation, and test sets.
+        This constructor initializes the class and filters the dataset to keep only patients
+        with isocenters on the arms.
 
         Notes:
-            - The dataset split is stratified by the class labels (collimator angle).
-            - The default split ratio is 80% for training, 10% for validation, and 10% for testing.
+            - The default output dimension is 30, which is the minimum number of parameters
+            for the model with 90 degrees pelvis collimator angle.
+            - For the the model with 5 and 355 degrees pelvis collimator angle the minimum output dimension is 24.
         """
-
-        _, test_idx = train_test_split(
-            self.df_patient_info.index,
-            train_size=0.91,
-        )
-        test_idx = test_idx.to_numpy()
-        train_idx = self.df_patient_info.index[
-            ~self.df_patient_info.index.isin(
-                test_idx
-            )  # remove test_idx from data frame
-        ].to_numpy()
-
-        train_idx, val_idx = train_test_split(
-            train_idx,
-            train_size=0.9,
-        )
-        self.train_idx = train_idx
-        return (train_idx, val_idx, test_idx)
+        super().__init__()
+        self.output = OUTPUT_DIM
+        iso_on_arms = self.df_patient_info.IsocenterOnArms.to_numpy(dtype=bool)
+        self.df_patient_info = self.df_patient_info.iloc[iso_on_arms]
 
     def unique_output(
         self, isocenters_pix_flat, jaws_X_pix_flat, jaws_Y_pix_flat
@@ -73,7 +49,7 @@ class DatasetArms(Dataset):
 
         Returns:
             np.ndarray: Array with the unique values from the input data.
-                The resulting array has a shape of (self.num_patients, 1, 32).
+                The resulting array has a shape of (self.num_patients, 1, self.output).
 
         Notes:
             - The resulting array contains 7 values for the isocenters,
@@ -81,7 +57,7 @@ class DatasetArms(Dataset):
             - Specific indices are used to select the unique values from the input arrays.
             Details about the selected indices can be found in the function implementation.
         """
-        y_reg = np.zeros(shape=(self.num_patients, 1, 30), dtype=float)
+        y_reg = np.zeros(shape=(self.num_patients, 1, self.output), dtype=float)
         for i, (iso, jaw_X_pix, jaw_Y_pix) in enumerate(
             zip(isocenters_pix_flat, jaws_X_pix_flat, jaws_Y_pix_flat)
         ):
@@ -102,18 +78,25 @@ class DatasetArms(Dataset):
                     (z + 3) * 3 * 2 + 2
                 ]  # Z-coord one for every couple of iso
 
-            # X_Jaws: take all the values except the for thorax, chest and head
-            unused_idx = [
-                5,  # overlap fourth iso with chest's field
-                8,  # Third iso deleted
-                9,  # Third iso deleted
-                10,  # Third iso deleted
-                11,  # Third iso deleted
-                13,  # overlap chest iso with head 's field
-                15,  # chest symmetry on iso
-                19,  # head symmetry on iso
+            # X_Jaws: take all the values except the for thorax, chest and head. Third iso removed.
+            unique_X_idx = [
+                0,
+                1,
+                2,
+                3,
+                4,
+                6,
+                7,
+                12,
+                14,
+                16,
+                17,
+                18,
+                20,
+                21,
+                22,
+                23,
             ]
-            y_jaw_X = np.delete(jaw_X_pix, unused_idx)
 
             # Y_Jaws: exploit the body's symmetry
             unique_Y_idx = [
@@ -125,7 +108,21 @@ class DatasetArms(Dataset):
                 18,
                 19,
             ]
-            # Keep [0,2] legs, 4 = one values fields (pelvis + chest), 8 = third iso, [16,17,18,19] head, [20,22] = arms
+
+            # Additional unused Jaws' values due to leg fields symmetries
+            if COLL_5_355:
+                for z in range(4):
+                    unique_X_idx.remove(
+                        z
+                    )  # remove [0,1,2,3] pelvis due to X_Jaws symmetry
+                # Remove [0,2] pelvis due to Y_Jaws being fixed
+                unique_Y_idx.remove(0)
+                unique_Y_idx.remove(2)
+
+            # Keep [0,1,2,3] pelvis, [4,6,7] abdomen, [12,14] shoulders, [16,17,18] head, [20,21,22,23] arms
+            y_jaw_X = jaw_X_pix[unique_X_idx]
+
+            # Keep [0,2] pelvis, 4 = one values fields (abdomen + shoulders), [16,17,18,19] head
             y_jaw_Y = jaw_Y_pix[unique_Y_idx]
             y_reg_local = np.concatenate(
                 (y_iso_new1, y_iso_new2, y_jaw_X, y_jaw_Y), axis=0
