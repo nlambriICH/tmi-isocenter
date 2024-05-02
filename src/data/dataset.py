@@ -78,14 +78,14 @@ class Dataset:
     def train_val_test_split(
         self,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Get the train/val/test indexes :
-            - 10% patients for test set
-            - 80% for training
-            - 10% for validation
+        """
+        Split the dataset into training, validation, and test sets.
 
         Returns:
-            tuple(np.ndarray, np.ndarray): train, val, and test index splits
+            tuple(np.ndarray, np.ndarray, np.ndarray): Index splits for train, validation, and test sets.
 
+        Notes:
+            - The default split ratio is 80% for training, 10% for validation, and 10% for testing.
         """
 
         _, test_idx = train_test_split(

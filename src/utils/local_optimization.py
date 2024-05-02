@@ -390,7 +390,7 @@ class Optimization:
                 self.processing.isocenters_pix[0][6, 2] - old_iso
             ) * self.aspect_ratio + self.processing.jaws_X_pix[0][7, 0]
 
-        # Fix arms isocenters simmetry
+        # Fix arms isocenters symmetry
         max_distance = 215 / self.pix_spacing
         symmetry_axis = self.processing.isocenters_pix[0][2, 0]
         upper_isocenter = self.processing.isocenters_pix[0][11, 0] - symmetry_axis
@@ -403,7 +403,8 @@ class Optimization:
 
         if upper_isocenter > max_distance or lower_isocenter > max_distance:
             print(
-                f"Maximum distance allowed between arms isocenters is: {max_distance}. Isocenters moved accordingly."
+                f"Maximum distance allowed between arms isocenters is {max_distance:.0f} pixels."
+                " Isocenters moved accordingly."
             )
             self.processing.isocenters_pix[0][10, 0] = symmetry_axis - max_distance
             self.processing.isocenters_pix[0][11, 0] = symmetry_axis + max_distance
@@ -640,9 +641,9 @@ class Optimization:
                 head_pelvis_iso_dist_pix - maximum_extension_pix
             )
             print(
-                f"Distance between head-pelvis isocenters was {int(head_pelvis_iso_dist_pix)} pixels."
-                f" Maximum allowed distance is {int(maximum_extension_pix)} (= 84 cm)."
-                f" Shifting pelvis isocenters by {int(shift_pixels)} pixels.",
+                f"Distance between head-pelvis isocenters was {head_pelvis_iso_dist_pix:.0f} pixels."
+                f" Maximum allowed distance is {maximum_extension_pix:.0f} (= 84 cm)."
+                f" Shifting pelvis isocenters by {shift_pixels:.0f} pixels.",
             )
             self.processing.isocenters_pix[0][[0, 1], 2] = (
                 self.processing.isocenters_pix[0][0, 2] + shift_pixels

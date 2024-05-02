@@ -1,7 +1,6 @@
 """Dataset utility functions"""
 
 import numpy as np
-from sklearn.model_selection import train_test_split
 
 from src.config.constants import COLL_5_355, OUTPUT_DIM
 from src.data.dataset import Dataset
@@ -36,38 +35,6 @@ class DatasetArms(Dataset):
         self.output = OUTPUT_DIM
         iso_on_arms = self.df_patient_info.IsocenterOnArms.to_numpy(dtype=bool)
         self.df_patient_info = self.df_patient_info.iloc[iso_on_arms]
-
-    def train_val_test_split(
-        self,
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """
-        Split the dataset into training, validation, and test sets.
-
-        Returns:
-            tuple(np.ndarray, np.ndarray, np.ndarray): Index splits for train, validation, and test sets.
-
-        Notes:
-            - The dataset split is stratified by the class labels (collimator angle).
-            - The default split ratio is 80% for training, 10% for validation, and 10% for testing.
-        """
-
-        _, test_idx = train_test_split(
-            self.df_patient_info.index,
-            train_size=0.91,
-        )
-        test_idx = test_idx.to_numpy()
-        train_idx = self.df_patient_info.index[
-            ~self.df_patient_info.index.isin(
-                test_idx
-            )  # remove test_idx from data frame
-        ].to_numpy()
-
-        train_idx, val_idx = train_test_split(
-            train_idx,
-            train_size=0.9,
-        )
-        self.train_idx = train_idx
-        return (train_idx, val_idx, test_idx)
 
     def unique_output(
         self, isocenters_pix_flat, jaws_X_pix_flat, jaws_Y_pix_flat
