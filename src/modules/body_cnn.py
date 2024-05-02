@@ -48,7 +48,7 @@ class BodyCNN(LitCNN):  # pylint: disable=too-many-ancestors
             self.logger.log_graph(self)  # pyright: ignore[reportOptionalMemberAccess]
 
         for name, param in self.named_parameters():
-            self.logger.experiment.add_histogram(  # pyright: ignore[reportOptionalMemberAccess , reportGeneralTypeIssues]
+            self.logger.experiment.add_histogram(  # pyright: ignore[reportOptionalMemberAccess, reportAttributeAccessIssue]
                 name, param, global_step=self.global_step
             )
 
@@ -57,7 +57,7 @@ class BodyCNN(LitCNN):  # pylint: disable=too-many-ancestors
 
         y_reg_hat = self.cnn(x)
         train_mse_loss = self.weighted_mse_loss(y_reg_hat, y_reg)
-        train_loss = self.train_mse_weight * train_mse_loss
+        train_loss = self.mse_loss_weight * train_mse_loss
         metrics = {
             "train_mse_loss": train_mse_loss,
             "train_loss": train_loss,

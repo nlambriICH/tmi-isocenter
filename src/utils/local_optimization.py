@@ -68,17 +68,17 @@ class Optimization:
         self.original_size = int(
             self.df_patient_info.iloc[
                 patient_idx, self.original_sizes_col_idx
-            ]  # pyright: ignore[reportGeneralTypeIssues]
+            ]  # pyright: ignore[reportCallIssue, reportArgumentType]
         )
         self.slice_thickness = float(
             self.df_patient_info.iloc[
                 patient_idx, self.slice_thickness_col_idx
-            ]  # pyright: ignore[reportGeneralTypeIssues]
+            ]  # pyright: ignore[reportCallIssue, reportArgumentType]
         )
         self.pix_spacing = float(
             self.df_patient_info.iloc[
                 patient_idx, self.pix_spacing_col_idx
-            ]  # pyright: ignore[reportArgumentType]
+            ]  # pyright: ignore[reportCallIssue, reportArgumentType]
         )
         self.optimization_result = OptimizationResult()
         self.optimization_search_space = OptimizationSearchSpace()
@@ -517,7 +517,7 @@ class Optimization:
         x_com = round(
             ndimage.center_of_mass(self.processing.masks[0][..., 0])[
                 0
-            ]  # pyright: ignore[reportGeneralTypeIssues]
+            ]  # pyright: ignore[reportArgumentType]
         )
         self.optimization_search_space.y_pixels_right = np.arange(
             x_com - 115, x_com - 50

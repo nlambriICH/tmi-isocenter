@@ -227,8 +227,8 @@ class Dataset:
         _, _, predict_index = self.train_val_test_split()
 
         (
-            masks_pred,
-            y_reg_pred,
+            masks,
+            y_reg,
             predict_index,
         ) = tuple(
             map(
@@ -242,8 +242,8 @@ class Dataset:
         )
 
         pred_dataset = TensorDataset(
-            masks_pred,
-            y_reg_pred,
+            masks,
+            y_reg,
             predict_index,
         )
 

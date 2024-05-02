@@ -63,7 +63,7 @@ if __name__ == "__main__":
             "lightning_logs",
             name=name,
             log_graph=True,
-        ),  # pyright: ignore[reportGeneralTypeIssues]
+        ),  # pyright: ignore[reportArgumentType]
         callbacks=[  # pyright: ignore[reportGeneralTypeIssues]
             EarlyStopping(monitor="val_mse_loss", mode="min", patience=7),
             ModelSummary(

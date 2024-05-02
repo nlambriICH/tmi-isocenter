@@ -1,12 +1,15 @@
 """Dataset utility functions"""
+
 import random
+
+import imgaug.augmenters as iaa
 import numpy as np
 import pandas as pd
-import imgaug.augmenters as iaa
 from imgaug.augmentables import Keypoint, KeypointsOnImage
-from src.utils.field_geometry_transf import get_zero_row_idx
-from src.data.processing import Processing
+
 from src.config.constants import MODEL
+from src.data.processing import Processing
+from src.utils.field_geometry_transf import get_zero_row_idx
 
 
 class Augmentation:
@@ -121,7 +124,7 @@ class Augmentation:
                         nb_iterations=(
                             2,
                             5,
-                        ),  # pyright: ignore[reportGeneralTypeIssues]
+                        ),  # pyright: ignore[reportArgumentType]
                         size=0.1,
                         squared=False,
                         fill_mode="constant",

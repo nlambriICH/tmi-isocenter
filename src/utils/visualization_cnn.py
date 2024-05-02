@@ -17,7 +17,7 @@ from src.utils.local_optimization import Optimization
 class Visualize:
     """Visualization class to visualize model's output"""
 
-    def __init__(self, log_dic) -> None:
+    def __init__(self) -> None:
         with np.load(join(RAW_DATA_DIR_PATH, "ptv_masks2D.npz")) as npz_masks2d:
             self.ptv_masks = list(npz_masks2d.values())
         with np.load(join(RAW_DATA_DIR_PATH, "ptv_imgs2D.npz")) as npz_masks2d:
@@ -38,7 +38,6 @@ class Visualize:
         self.pix_spacing_col_idx = self.df_patient_info.columns.get_loc(
             key="PixelSpacing"
         )
-        self.model_dir = log_dic
 
     def reshape_output(
         self,
@@ -56,14 +55,16 @@ class Visualize:
         - torch.Tensor: output tensor with resized shape.
 
         """
-        pix_spacing = self.df_patient_info.iloc[patient_idx, self.pix_spacing_col_idx]
+        pix_spacing = self.df_patient_info.iloc[
+            patient_idx, self.pix_spacing_col_idx
+        ]  # pyright: ignore[reportCallIssue, reportArgumentType]
         slice_thickness = self.df_patient_info.iloc[
             patient_idx, self.slice_thickness_col_idx
-        ]
+        ]  # pyright: ignore[reportCallIssue, reportArgumentType]
         original_size = int(
             self.df_patient_info.iloc[
                 patient_idx, self.original_sizes_col_idx
-            ]  # pyright: ignore[reportGeneralTypeIssues]
+            ]  # pyright: ignore[reportCallIssue, reportArgumentType]
         )
 
         # X and Y jaws: Fixed aperture
@@ -141,12 +142,12 @@ class Visualize:
         slice_thickness = float(
             self.df_patient_info.iloc[
                 patient_idx, self.slice_thickness_col_idx
-            ]  # pyright: ignore[reportGeneralTypeIssues]
+            ]  # pyright: ignore[reportCallIssue, reportArgumentType]
         )
         original_size = int(
             self.df_patient_info.iloc[
                 patient_idx, self.original_sizes_col_idx
-            ]  # pyright: ignore[reportGeneralTypeIssues]
+            ]  # pyright: ignore[reportCallIssue, reportArgumentType]
         )
 
         # Isocenter indexes
@@ -493,9 +494,6 @@ class Visualize:
                 )
 
             if angle != 90:
-                print(
-                    f"Collimator angle for field {i + 1} was {angle}°. Plotting with angle=0° for visualization"
-                )
                 angle = 0
             elif angle == 90:
                 offset_col *= aspect_ratio
@@ -553,10 +551,12 @@ class Visualize:
         - The function calls the `extract_data` function to reorganize the CNN output.
         """
 
-        pix_spacing = self.df_patient_info.iloc[patient_idx, self.pix_spacing_col_idx]
+        pix_spacing = self.df_patient_info.iloc[
+            patient_idx, self.pix_spacing_col_idx
+        ]  # pyright: ignore[reportCallIssue, reportArgumentType]
         slice_thickness = self.df_patient_info.iloc[
             patient_idx, self.slice_thickness_col_idx
-        ]
+        ]  # pyright: ignore[reportCallIssue, reportArgumentType]
         aspect_ratio = (
             slice_thickness / pix_spacing
         )  # pyright: ignore[reportGeneralTypeIssues]
@@ -564,7 +564,7 @@ class Visualize:
         original_size = int(
             self.df_patient_info.iloc[
                 patient_idx, self.original_sizes_col_idx
-            ]  # pyright: ignore[reportGeneralTypeIssues]
+            ]  # pyright: ignore[reportCallIssue, reportArgumentType]
         )
 
         if output.shape[0] < 84:
