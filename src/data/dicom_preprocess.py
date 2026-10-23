@@ -117,6 +117,11 @@ def filter_intestine_name(name: str) -> bool:
     )
 
 
+def filter_intestine_name_fallback(name: str) -> bool:
+    name_lower = name.lower()
+    return "abdominopelvic" in name_lower
+
+
 def filter_bladder_name(name: str) -> bool:
     name_lower = name.lower()
     return "vescica" in name_lower or "bladder" in name_lower
@@ -180,6 +185,11 @@ def get_oars_masks_3d(
 
     try:
         intestine_name = next(filter(filter_intestine_name, roi_name_list), "")
+        if intestine_name == "":
+            intestine_name = next(
+                filter(filter_intestine_name_fallback, roi_name_list), ""
+            )
+
         mask_3d_intestine = rtstruct.get_roi_mask_by_name(intestine_name)
     except AttributeError:
         tqdm.write("No contours for intestine ROI. Assign to mask of zeros")
@@ -561,9 +571,9 @@ def read_dicoms() -> (
                 ds.RTPlanLabel,
                 ds.StudyDate,
                 0 if np.all(iso_pixel[-2:] == 0) else 1,  # isocenters on arms
-                0
-                if np.all(coll_angles[:2] == 90)
-                else 1,  # 5/355° coll angle on pelvis
+                (
+                    0 if np.all(coll_angles[:2] == 90) else 1
+                ),  # 5/355° coll angle on pelvis
                 ptv_mask_3d.shape[0],
                 ptv_mask_3d.shape[1],
                 ptv_mask_3d.shape[2],
