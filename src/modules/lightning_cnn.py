@@ -41,8 +41,11 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
         self.learning_rate = learning_rate
         self.mse_loss_weight = mse_loss_weight
 
-        self.weights = torch.ones(output)
-        self.weights[focus_on] = weight
+        weights = torch.ones(output)
+        weights[focus_on] = weight
+        # Registered as a buffer so Lightning moves it to the same device as the model (CPU/GPU).
+        # persistent=False keeps it out of the state_dict, so existing checkpoints still load.
+        self.register_buffer("weights", weights, persistent=False)
         self.save_hyperparameters()
         self.filters = filters
 
@@ -151,18 +154,18 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
 
         # Two plots: (1) train (overfitting) and (2) test images
         viz.plot_img(
-            input_img=x_train.numpy()[0],
+            input_img=x_train.cpu().numpy()[0],
             patient_idx=int(train_index.item()),
-            output=y_train_reg_hat[0],
+            output=y_train_reg_hat[0].cpu(),
             path=self.logger.log_dir,  # pyright: ignore[reportArgumentType,reportOptionalMemberAccess]
             single_fig=True,
         )
         viz.plot_img(
-            input_img=x.numpy()[0],
+            input_img=x.cpu().numpy()[0],
             patient_idx=int(test_idx.item()),
-            output=y_reg_hat[0],
+            output=y_reg_hat[0].cpu(),
             path=self.logger.log_dir,  # pyright: ignore[reportArgumentType,reportOptionalMemberAccess]
-            mse=test_mse_loss,
+            mse=test_mse_loss.cpu(),
         )
 
     def predict_step(  # pylint: disable=arguments-differ
@@ -193,9 +196,9 @@ class LitCNN(pl.LightningModule):  # pylint: disable=too-many-ancestors
         from os import getcwd
 
         viz.plot_img(
-            input_img=x.numpy()[0],
+            input_img=x.cpu().numpy()[0],
             patient_idx=int(pred_idx.item()),
-            output=y_reg_hat[0],
+            output=y_reg_hat[0].cpu(),
             path=getcwd(),  # pyright: ignore[reportArgumentType,reportOptionalMemberAccess]
             single_fig=False,
         )

@@ -1,5 +1,7 @@
 """Script for model training"""
 
+import argparse
+
 from lightning import Trainer
 from lightning.pytorch.callbacks import LearningRateMonitor, ModelSummary
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
@@ -9,6 +11,15 @@ from torch.utils.data import DataLoader
 from src.config.constants import COLL_5_355, MODEL, NUM_WORKERS
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Train and test the CNN model.")
+    parser.add_argument(
+        "--max-epochs",
+        type=int,
+        default=50,
+        help="Maximum number of training epochs (early stopping may end training sooner).",
+    )
+    args = parser.parse_args()
+
     if MODEL == "arms":
         from src.data.dataset_arms import DatasetArms
         from src.modules.arms_cnn import ArmsCNN
@@ -71,7 +82,7 @@ if __name__ == "__main__":
             ),  # print the weights summary of the model when trainer.fit() is called
             LearningRateMonitor(logging_interval="epoch"),
         ],
-        max_epochs=50,
+        max_epochs=args.max_epochs,
         log_every_n_steps=1,
     )
 

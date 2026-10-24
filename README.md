@@ -6,6 +6,9 @@ A deep learning model that predicts the **field geometry** of Total Marrow Irrad
 - **Output:** a vector of isocenter coordinates and jaw apertures, learned by a convolutional neural network with a regression head.
 - **Stack:** PyTorch + PyTorch Lightning, TensorBoard for monitoring.
 
+> **No installation option:** you can run the whole project in your browser, on a free GPU, with Google Colab. See the [Colab guide](notebooks/COLAB.md).
+> The rest of this README explains how to run the project on your own computer.
+
 ## 1. Requirements
 
 - **Python 3.11.1** (this exact version was used to develop and test the project; other 3.11.x releases should also work, newer versions are **not** supported by the pinned dependencies).
@@ -148,7 +151,11 @@ This combines the masks into 3-channel images, resizes them to 512×512 and appl
 python -m src.train_cnn
 ```
 
-This trains the model selected by `model` in `constants.json` (up to 50 epochs, with early stopping on the validation loss) and then evaluates it on the test set. On a CPU, expect a long run: start with a short experiment if you are just exploring.
+This trains the model selected by `model` in `constants.json` (up to 50 epochs, with early stopping on the validation loss) and then evaluates it on the test set. On a CPU, expect about 11 minutes per epoch: for a shorter experiment, limit the number of epochs:
+
+```
+python -m src.train_cnn --max-epochs 5
+```
 
 Everything is saved in `lightning_logs/<model>_model_5_355/version_<N>/`:
 - `checkpoints/*.ckpt`: the trained weights.
