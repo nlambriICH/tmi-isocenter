@@ -1,0 +1,13 @@
+{
+    "ptv_exclude_substrings": [],
+    "map_id_ptv_coll_90": {},
+    "map_id_junction_coll_90": {},
+    "map_id_ptv_coll_5_355": {},
+    "map_id_junction_coll_5_355": {},
+    "map_lung_roi_name": {},
+    "dicom_path": "",
+    "dicom_dir_test_path": "",
+    "model": "body",
+    "coll_5_355": true,
+    "num_workers": 0
+}
