@@ -49,6 +49,7 @@ Colab deletes all files when the session ends (after a period of inactivity, or 
 
 ## Troubleshooting
 
+- **Strange errors after the instructor updated the code:** start from a clean machine with **Runtime → Disconnect and delete runtime**, then run the notebook again. Step 2 prints the code version it is using.
 - **The session restarts in the middle of the notebook:** run *Runtime → Run all* again. Completed steps are skipped.
 - **`Missing data files` error:** the dataset download failed (Google Drive limits downloads). Wait a few minutes and re-run the cell.
 - **`GPU available: False`:** you are on a CPU runtime. Change it as in step 2 and run the notebook again (the session restarts and setup is repeated).
