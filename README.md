@@ -6,7 +6,7 @@ A deep learning model that predicts the **field geometry** of Total Marrow Irrad
 - **Output:** a vector of isocenter coordinates and jaw apertures, learned by a convolutional neural network with a regression head.
 - **Stack:** PyTorch + PyTorch Lightning, TensorBoard for monitoring.
 
-> **No installation option:** you can run the whole project in your browser, on a free GPU, with Google Colab. See the [Colab guide](notebooks/COLAB.md).
+> **No installation option:** you can run the whole project in your browser, on a free GPU, with Google Colab. See the [Colab guide](notebooks/colab/COLAB.md).
 > The rest of this README explains how to run the project on your own computer.
 
 ## 1. Requirements
