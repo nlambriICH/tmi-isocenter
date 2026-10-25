@@ -13,9 +13,12 @@ After opening a notebook, click **Copy to Drive** in the toolbar. You get your o
 
 ## How to run a notebook
 
+You need the **dataset passkey**, which the instructor gives you. The dataset is encrypted: without the passkey it cannot be opened. Do not write the passkey in the notebook or share it.
+
 1. Menu **Runtime → Run all**.
 2. The first cell installs `conda` and **restarts the session**. Colab may show a *"session crashed"* or *"restarting"* message: this is expected.
 3. Run **Runtime → Run all** a second time. The installation is skipped and the rest of the notebook runs.
+4. When the notebook asks for the **Dataset passkey**, type it in the box and press Enter. It is asked once per session.
 
 Both notebooks first download the code and the dataset, then create a Python 3.11 environment (3-5 min, only the first time in a session).
 
@@ -56,9 +59,19 @@ The notebook shows the error (MSE) of each of the 11 test patients and, for the 
 
 - **Strange errors after the instructor updated the code:** start from a clean machine with **Runtime → Disconnect and delete runtime**, then run the notebook again. The download step prints the code version it is using.
 - **The session restarts in the middle of the notebook:** run *Runtime → Run all* again. Completed steps are skipped.
-- **`Missing data files` error:** the dataset download failed (Google Drive limits downloads). Wait a few minutes and re-run the cell.
+- **`Wrong passkey` error:** re-run the cell and type the passkey again (check spaces and upper/lower case). The dataset is not downloaded again.
+- **`Missing data files` error or a download error:** the dataset download failed (Google Drive limits downloads). Wait a few minutes and re-run the cell.
 - **`GPU available: False` in the training notebook:** you are on a CPU runtime. Change it and run the notebook again (the session restarts and setup is repeated).
 - **TensorBoard does not show:** it is optional. Skip that cell; the results are also shown in Step 6.
 - **"You cannot currently connect to a GPU due to usage limits":** Colab's free GPU quota is used up. Use a CPU runtime with a small `MAX_EPOCHS`, or try again later.
 - **`No saved runs` in the evaluation notebook:** run Step 7 of the training notebook first, with the same Google account.
 - **`The checkpoint predicts ... values` error:** `MODEL` does not match the trained model. Set it to the other type (`"body"` or `"arms"`).
+
+## For instructors: update the dataset
+
+The notebooks download an AES-256 encrypted archive of `data/5_355` (anonymized `patient_info.csv` + `raw/`) from Google Drive.
+
+1. From the repository root, run `bash scripts/encrypt_dataset.sh` and choose a passkey (at least 12 characters). It creates `tmi-dataset-5_355.tar.gz.enc`, which is ignored by git.
+2. Upload the file to Google Drive and share it as *Anyone with the link*. Copy the file ID from the link (`https://drive.google.com/file/d/<FILE_ID>/view`).
+3. Set `DATA_FILE_ID` to that ID in the dataset cell of both notebooks, then commit and push.
+4. Give the passkey to the students outside the repository. To change the passkey, repeat steps 1-4.

@@ -180,3 +180,6 @@ cython_debug/
 
 # Built Visual Studio Code Extensions
 *.vsix
+
+# Encrypted dataset archive for Colab (scripts/encrypt_dataset.sh)
+*.enc
